@@ -228,6 +228,9 @@ function promptTextParts(value) {
     if (typeof value.text === 'string') return [value.text];
     if (value.prompt !== undefined) return promptTextParts(value.prompt);
     if (value.input !== undefined) return promptTextParts(value.input);
+    if (value.messages !== undefined) return promptTextParts(value.messages);
+    if (value.chat !== undefined) return promptTextParts(value.chat);
+    if (value.parts !== undefined) return promptTextParts(value.parts);
     return [];
 }
 function renderedWiContent(entry) {
@@ -246,15 +249,24 @@ function renderedWiContent(entry) {
 }
 function confirmedWiEntries(entryList, generationData) {
     const parts = promptTextParts(generationData?.prompt ?? generationData?.input);
-    if (!parts.length) return [];
-    const normalized = parts.map(text => text.replace(/\s+/g, ' ').trim());
+    const finalPrompt = parts.join('\n').replace(/\s+/g, ' ').trim();
+
     return entryList.filter(entry => {
-        const expected = renderedWiContent(entry);
-        // Short strings cannot be attributed to a specific WI entry with confidence.
-        if (expected.length < 12) return false;
-        const compact = expected.replace(/\s+/g, ' ').trim();
-        return parts.some(part => part.includes(expected)) ||
-            (compact.length >= 24 && normalized.some(part => part.includes(compact)));
+        // SillyTavern has already applied probability, budget, group and activation rules
+        // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
+        // 'No active entries' for ordinary (non-outlet) entries.
+        const rendered = renderedWiContent(entry);
+        if (!rendered) return false;
+        if (entry.position !== world_info_position.outlet) return true;
+
+        // Outlet entries are activated by the scan even when no outlet is consumed
+        // by the preset. Only include one if its text actually reaches the request.
+        if (!finalPrompt) return false;
+        const candidates = [rendered, String(entry.content ?? '')];
+        return candidates.some(text => {
+            const normalized = text.replace(/\s+/g, ' ').trim();
+            return normalized.length > 0 && finalPrompt.includes(normalized);
+        });
     });
 }
 
@@ -276,6 +288,8 @@ const init = ()=>{
         });
         trigger.addEventListener('contextmenu', (evt)=>{
             evt.preventDefault();
+            clearTimeout(longPressTimer);
+            if (Date.now() - lastLongPressMenuAt < 900) return;
             configPanel.classList.toggle('stwii--isActive');
             requestAnimationFrame(ensurePanelsVisible);
         });
@@ -512,6 +526,38 @@ const init = ()=>{
     let baseLeft = 0, baseTop = 0;
     let movedEnough = false;
     let suppressNextClick = false;
+    let longPressTimer = null;
+    let longPressPointerId = null;
+    let longPressStartX = 0;
+    let longPressStartY = 0;
+    let lastLongPressMenuAt = 0;
+
+    function clearLongPress() {
+        clearTimeout(longPressTimer);
+        longPressTimer = null;
+        longPressPointerId = null;
+    }
+    function onLongPressPointerDown(e) {
+        if (e.pointerType !== 'touch' || e.button !== 0) return;
+        clearLongPress();
+        longPressPointerId = e.pointerId;
+        longPressStartX = e.clientX;
+        longPressStartY = e.clientY;
+        longPressTimer = setTimeout(() => {
+            longPressTimer = null;
+            lastLongPressMenuAt = Date.now();
+            suppressNextClick = true;
+            // A long press opens settings rather than also toggling the entry list.
+            configPanel.classList.add('stwii--isActive');
+            requestAnimationFrame(ensurePanelsVisible);
+            setTimeout(() => { suppressNextClick = false; }, 850);
+        }, 550);
+    }
+    function onLongPressPointerMove(e) {
+        if (e.pointerId !== longPressPointerId) return;
+        if (Math.abs(e.clientX - longPressStartX) > 10 ||
+            Math.abs(e.clientY - longPressStartY) > 10) clearLongPress();
+    }
 
     function onPointerDown(e) {
         if (!(extension_settings.worldInfoInfo?.drag)) return; // dragging disabled
@@ -567,7 +613,11 @@ const init = ()=>{
         requestAnimationFrame(ensurePanelsVisible);
     }
 
+    trigger.addEventListener('pointerdown', onLongPressPointerDown);
     trigger.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('pointermove', onLongPressPointerMove);
+    window.addEventListener('pointerup', clearLongPress);
+    window.addEventListener('pointercancel', clearLongPress);
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', endDrag);
     window.addEventListener('pointercancel', endDrag);
@@ -1305,15 +1355,7 @@ function endBuildSession() {
             }
         } catch {}
 
-        const triggers = [
-            '[WI] Found 0 world lore entries. Sorted by strategy',
-            '[WI] Adding 0 entries to prompt',
-        ];
-        if (triggers.includes(args[0])) {
-            panel.innerHTML = 'No active entries';
-            updateBadge([]);
-            currentEntryList = [];
-        }
+        // No UI changes here: zero-entry and dry-run debug logs are not definitive.
         return original_debug.bind(console)(...args);
     };
     const original_log = console.log;
@@ -1397,15 +1439,7 @@ function endBuildSession() {
             }
         } catch {}
 
-        const triggers = [
-            '[WI] Found 0 world lore entries. Sorted by strategy',
-            '[WI] Adding 0 entries to prompt',
-        ];
-        if (triggers.includes(args[0])) {
-            panel.innerHTML = 'No active entries';
-            updateBadge([]);
-            currentEntryList = [];
-        }
+        // No UI changes here: zero-entry and dry-run debug logs are not definitive.
         return original_log.bind(console)(...args);
     };
     STWII.unpatchConsole = function() {
