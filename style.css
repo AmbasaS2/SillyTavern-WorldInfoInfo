@@ -1,4 +1,6 @@
 .stwii--trigger {
+  user-select: none;
+  -webkit-touch-callout: none;
   position: absolute;
   bottom: 0.125em;
   left: 0.25em;
