@@ -1,4 +1,4 @@
-import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced } from '../../../../script.js';
+import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
 import { metadata_keys } from '../../../authors-note.js';
 import { extension_settings } from '../../../extensions.js';
 import { promptManager } from '../../../openai.js';
@@ -6,6 +6,7 @@ import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { delay, flashHighlight } from '../../../utils.js';
 import { world_info_position, world_names, loadWorldInfo, openWorldInfoEditor } from '../../../world-info.js';
+import { getRegexedString, regex_placement } from '../../regex/engine.js';
 import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 
@@ -117,27 +118,160 @@ const getStrategy = (entry)=>{
     }
 };
 
+
+// 2026-11-18 fork: display-only compatibility with Lorebook Manager; no writes to its data.
+function displayWiTitle(entry) {
+    const source = String(entry?.comment ?? '');
+    const original = source.trim() || (Array.isArray(entry?.key) ? entry.key : entry?.keys ?? []).join(', ');
+    const settings = extension_settings['simple-lorebook'];
+    const id = String(entry?.world ?? '') + '\u241f' + String(entry?.uid ?? '');
+    const record = settings?.translations?.[id];
+    const language = settings?.entryLanguagePairs?.[id]?.translationLanguage;
+    const title = record?.fields?.comment;
+    if (record?.language !== 'Korean' || (language && language !== 'Korean') || title?.source !== source) return original;
+    return typeof title?.text === 'string' && title.text.trim() ? title.text.trim() : original;
+}
+
+
+// Read-only body preview: the manager stores a hash of the original body.
+function loreBodyHash(source) {
+    const value=String(source ?? '');
+    let hash=2166136261;
+    for (let i=0; i<value.length; i++) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619) >>> 0;
+    }
+    return hash.toString(36) + '_' + value.length;
+}
+function displayWiBody(entry) {
+    const source=String(entry?.content ?? '');
+    const settings=extension_settings['simple-lorebook'];
+    const id=String(entry?.world ?? '') + '\u241f' + String(entry?.uid ?? '');
+    const record=settings?.translations?.[id];
+    const language=settings?.entryLanguagePairs?.[id]?.translationLanguage;
+    const usable=record?.language==='Korean' && (!language || language==='Korean')
+        && record.sourceHash===loreBodyHash(source);
+    return usable && typeof record.text==='string' && record.text.trim()
+        ? record.text : source;
+}
+let currentLoreViewer=null;
+function closeLoreViewer() {
+    const viewer=currentLoreViewer;
+    if (!viewer) return;
+    currentLoreViewer=null;
+    document.removeEventListener('keydown',viewer.onKeydown);
+    viewer.overlay.remove();
+    viewer.previousFocus?.focus?.();
+}
+async function showLoreViewer(entry) {
+    closeLoreViewer();
+    const overlay=document.createElement('div');
+    overlay.className='stwii--reader-overlay';
+    const dialog=document.createElement('section');
+    dialog.className='stwii--reader-dialog';
+    dialog.setAttribute('role','dialog');
+    dialog.setAttribute('aria-modal','true');
+    dialog.setAttribute('aria-label','Lorebook entry');
+    const header=document.createElement('div');
+    header.className='stwii--reader-header';
+    const title=document.createElement('div');
+    title.className='stwii--reader-title';
+    title.textContent=displayWiTitle(entry);
+    const close=document.createElement('button');
+    close.type='button';
+    close.className='stwii--reader-close';
+    close.setAttribute('aria-label','닫기');
+    close.textContent='×';
+    const body=document.createElement('textarea');
+    body.className='stwii--reader-body';
+    body.setAttribute('aria-label','로어 본문');
+    body.readOnly=true;
+    body.spellcheck=false;
+    body.value='불러오는 중...';
+    header.append(title,close);
+    dialog.append(header,body);
+    overlay.append(dialog);
+    const previousFocus=document.activeElement;
+    const onKeydown=(event)=>{
+        if (event.key==='Escape') {event.preventDefault();closeLoreViewer();}
+        if (event.key==='Tab' && !dialog.contains(document.activeElement)) {
+            event.preventDefault();close.focus();
+        }
+    };
+    currentLoreViewer={overlay,onKeydown,previousFocus};
+    close.addEventListener('click',closeLoreViewer);
+    overlay.addEventListener('click',event=>{if(event.target===overlay)closeLoreViewer();});
+    document.body.append(overlay);
+    document.addEventListener('keydown',onKeydown);
+    close.focus();
+    try {
+        const data=await loadWorldInfo(entry.world);
+        if (currentLoreViewer?.overlay!==overlay) return;
+        const current=data?.entries?.[Number(entry.uid)];
+        const full=current ? {...current,world:entry.world,uid:entry.uid} : entry;
+        title.textContent=displayWiTitle(full);
+        body.value=displayWiBody(full);
+    } catch {
+        if (currentLoreViewer?.overlay!==overlay) return;
+        title.textContent=displayWiTitle(entry);
+        body.value=String(entry?.content ?? '');
+    }
+}
+
+// SillyTavern emits activated scan candidates before final prompt assembly.
+// Compare the post-regex content with the generation request; unreferenced outlets must not appear.
+function promptTextParts(value) {
+    if (typeof value === 'string') return [value];
+    if (Array.isArray(value)) return value.flatMap(promptTextParts);
+    if (!value || typeof value !== 'object') return [];
+    if (value.content !== undefined) return promptTextParts(value.content);
+    if (typeof value.text === 'string') return [value.text];
+    if (value.prompt !== undefined) return promptTextParts(value.prompt);
+    if (value.input !== undefined) return promptTextParts(value.input);
+    return [];
+}
+function renderedWiContent(entry) {
+    if (!entry?.content || entry.disable === true) return '';
+    if (entry.position === world_info_position.outlet && !entry.outletName) return '';
+    try {
+        const depth = entry.position === world_info_position.atDepth ? (entry.depth ?? 4) : null;
+        const text = getRegexedString(entry.content, regex_placement.WORLD_INFO, {
+            depth, isMarkdown: false, isPrompt: true,
+        });
+        return typeof text === 'string' ? text.trim() : '';
+    } catch (error) {
+        console.warn('[WorldInfo Info] Unable to verify entry content', error);
+        return '';
+    }
+}
+function confirmedWiEntries(entryList, generationData) {
+    const parts = promptTextParts(generationData?.prompt ?? generationData?.input);
+    if (!parts.length) return [];
+    const normalized = parts.map(text => text.replace(/\s+/g, ' ').trim());
+    return entryList.filter(entry => {
+        const expected = renderedWiContent(entry);
+        // Short strings cannot be attributed to a specific WI entry with confidence.
+        if (expected.length < 12) return false;
+        const compact = expected.replace(/\s+/g, ' ').trim();
+        return parts.some(part => part.includes(expected)) ||
+            (compact.length >= 24 && normalized.some(part => part.includes(compact)));
+    });
+}
+
 let generationType;
 eventSource.on(event_types.GENERATION_STARTED, (genType)=>generationType = genType);
 
 const init = ()=>{
     if (window.STWII?.initialized) return;
     STWII.initialized = true;
-    // One-time retention trimming on init
-    try {
-        if (Array.isArray(chat_metadata.stwiiActivationEvents) && chat_metadata.stwiiActivationEvents.length > STWII.MAX_ACTIVATION_EVENTS) {
-            chat_metadata.stwiiActivationEvents.splice(0, chat_metadata.stwiiActivationEvents.length - STWII.MAX_ACTIVATION_EVENTS);
-        }
-        if (Array.isArray(chat_metadata.stwiiBuilds)) {
-            trimBuilds();
-        }
-    } catch {}
+    // Preserve legacy chat metadata without adding further raw logs.
     const trigger = document.createElement('div'); {
         trigger.classList.add('stwii--trigger');
         trigger.classList.add('fa-solid', 'fa-fw', 'fa-book-atlas');
         trigger.title = 'Active WI\n---\nright click for options';
         trigger.addEventListener('click', ()=>{
             panel.classList.toggle('stwii--isActive');
+            if (panel.classList.contains('stwii--isActive') && currentEntryList.length) updatePanel(currentEntryList);
             requestAnimationFrame(ensurePanelsVisible);
         });
         trigger.addEventListener('contextmenu', (evt)=>{
@@ -468,67 +602,103 @@ const init = ()=>{
     let entries = [];
 
     let count = -1;
-    const updateBadge = async(newEntries)=>{
-        if (count != newEntries.length) {
-            if (newEntries.length == 0) {
+    let badgeToken = 0;
+    const updateBadge = async(newEntries) => {
+        const token = ++badgeToken;
+        const oldCount = count;
+        const changedEntries = new Set(newEntries).difference(new Set(entries)).size > 0;
+        count = newEntries.length;
+        entries = [...newEntries];
+        trigger.classList.remove('stwii--badge-in', 'stwii--badge-out', 'stwii--badge-bounce');
+        if (oldCount !== count) {
+            if (count === 0) {
+                if (oldCount < 0) {
+                    trigger.setAttribute('data-stwii--badge-count', '0');
+                    return;
+                }
                 trigger.classList.add('stwii--badge-out');
                 await delay(510);
-                trigger.setAttribute('data-stwii--badge-count', newEntries.length.toString());
+                if (token !== badgeToken) return;
+                trigger.setAttribute('data-stwii--badge-count', '0');
                 trigger.classList.remove('stwii--badge-out');
-            } else if (count == 0) {
-                trigger.classList.add('stwii--badge-in');
-                trigger.setAttribute('data-stwii--badge-count', newEntries.length.toString());
-                await delay(510);
-                trigger.classList.remove('stwii--badge-in');
             } else {
-                trigger.setAttribute('data-stwii--badge-count', newEntries.length.toString());
-                trigger.classList.add('stwii--badge-bounce');
-                await delay(1010);
-                trigger.classList.remove('stwii--badge-bounce');
+                const cls = oldCount === 0 ? 'stwii--badge-in' : 'stwii--badge-bounce';
+                trigger.setAttribute('data-stwii--badge-count', String(count));
+                trigger.classList.add(cls);
+                await delay(cls === 'stwii--badge-in' ? 510 : 1010);
+                if (token === badgeToken) trigger.classList.remove(cls);
             }
-            count = newEntries.length;
-        } else if (new Set(newEntries).difference(new Set(entries)).size > 0) {
+        } else if (changedEntries) {
             trigger.classList.add('stwii--badge-bounce');
             await delay(1010);
-            trigger.classList.remove('stwii--badge-bounce');
+            if (token === badgeToken) trigger.classList.remove('stwii--badge-bounce');
         }
-        entries = newEntries;
     };
     let currentEntryList = [];
     let currentChat = [];
-    eventSource.on(event_types.WORLD_INFO_ACTIVATED, async(entryList)=>{
-        panel.innerHTML = 'Updating...';
+    let pendingEntries = [];
+    let generationSerial = 0;
+    let lastReportBuild = null;
+    const resetDisplayedEntries = () => {
+        generationSerial++;
+        pendingEntries = [];
+        currentEntryList = [];
+        lastReportBuild = null;
+        stwiiCurrentBuild = null;
+        activationDrafts.clear();
+        lastWorldByUid.clear();
+        stwiiCurrentLoopCounts = null;
+        stwiiCurrentLoopEntryIds = null;
+        stwiiCurrentLoopEventIds = null;
+        stwiiActiveLoopIndex = -1;
+        panel.textContent = 'No active entries';
+        void updateBadge([]);
+    };
+    eventSource.on(event_types.GENERATION_STARTED, resetDisplayedEntries);
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        resetDisplayedEntries();
+        lastReportBuild = null;
+    });
 
-        // Exclude disabled entries
+    // Activation events describe scan candidates, not actual final prompt insertion.
+    eventSource.on(event_types.WORLD_INFO_ACTIVATED, async(entryList) => {
+        const serial = generationSerial;
         const filtered = entryList.filter(e => e?.disable !== true);
-
-        updateBadge(filtered.map(it=>`${it.world}§§§${it.uid}`));
-
         for (const entry of filtered) {
             entry.type = 'wi';
             entry.sticky = parseInt(/**@type {string}*/(await SlashCommandParser.commands['wi-get-timed-effect'].callback(
                 {
-                    effect: 'sticky',
-                    format: 'number',
-                    file: `${entry.world}`,
-                    _scope: null,
-                    _abortController: null,
-                },
-                entry.uid,
+                    effect: 'sticky', format: 'number', file: String(entry.world),
+                    _scope: null, _abortController: null,
+                }, entry.uid,
             )));
         }
-
-        currentEntryList = [...filtered];
-
-        if (filtered.length === 0) {
-            panel.innerHTML = 'No active entries';
-            updatePanel(filtered, true);
-            return;
-        }
-
-        updatePanel(filtered, true);
+        if (serial !== generationSerial) return;
+        pendingEntries = filtered;
+        panel.textContent = 'Checking final prompt...';
     });
 
+    eventSource.on(event_types.GENERATE_AFTER_DATA, (data, dryRun) => {
+        if (dryRun) return;
+        const included = confirmedWiEntries(pendingEntries, data);
+        pendingEntries = [];
+        currentEntryList = [...included];
+        void updateBadge(included.map(it => String(it.world) + '§§§' + String(it.uid)));
+        if (included.length) updatePanel(included, true);
+        else panel.textContent = 'No active entries';
+
+        // Persist one compact report; never persist the intercepted console logs.
+        const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
+        const build = lastReportBuild?.chatId === getCurrentChatId() ? lastReportBuild : null;
+        if (build) build.added = build.added.filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)));
+        chat_metadata.stwiiLastReport = {
+            runId: build?.runId ?? Date.now(),
+            added: build?.added ?? [],
+            loopCounts: Array.isArray(stwiiCurrentLoopCounts) ? [...stwiiCurrentLoopCounts] : [],
+            loopEntryIds: stwiiCurrentLoopCounts?.length && Array.isArray(chat_metadata.stwiiLastLoopEntryIds)
+                ? chat_metadata.stwiiLastLoopEntryIds.map(ids => Array.isArray(ids) ? [...ids] : null) : [],
+        };
+    });
 
     const updatePanel = (entryList, newChat = false)=>{
         const isGrouped = extension_settings.worldInfoInfo?.group ?? true;
@@ -620,12 +790,10 @@ const init = ()=>{
                         if (aDepthPos && bDepthPos && (a.depth ?? Number.MAX_SAFE_INTEGER) > (b.depth ?? Number.MAX_SAFE_INTEGER)) return -1;
                         if ((a.order ?? Number.MAX_SAFE_INTEGER) > (b.order ?? Number.MAX_SAFE_INTEGER)) return 1;
                         if ((a.order ?? Number.MAX_SAFE_INTEGER) < (b.order ?? Number.MAX_SAFE_INTEGER)) return -1;
-                        return (a.comment ?? a.key.join(', ')).toLowerCase().localeCompare((b.comment ?? b.key.join(', ')).toLowerCase());
+                        return displayWiTitle(a).toLowerCase().localeCompare(displayWiTitle(b).toLowerCase());
                     } else {
                         // order alphabetically
-                        return (a.comment?.length ? a.comment : a.key.join(', '))
-                            .toLowerCase()
-                            .localeCompare(b.comment?.length ? b.comment : b.key.join(', '))
+                        return displayWiTitle(a).toLowerCase().localeCompare(displayWiTitle(b).toLowerCase())
                         ;
                     }
                 });
@@ -717,11 +885,11 @@ const init = ()=>{
                             e.classList.add('stwii--actionable');
                             e.tabIndex = 0;
                             e.setAttribute('role', 'button');
-                            e.addEventListener('click', () => openActiveEntry(entry.world, entry.uid));
+                            e.addEventListener('click', () => showLoreViewer(entry));
                             e.addEventListener('keydown', (event) => {
                                 if (event.key !== 'Enter' && event.key !== ' ') return;
                                 event.preventDefault();
-                                openActiveEntry(entry.world, entry.uid);
+                                showLoreViewer(entry);
                             });
                         }
                         const wipEx = [world_info_position.EMTop, world_info_position.EMBottom];
@@ -743,8 +911,8 @@ const init = ()=>{
                         const title = document.createElement('div'); {
                             title.classList.add('stwii--title');
                             if (entry.type == 'wi') {
-                                title.textContent = entry.comment?.length ? entry.comment : entry.key.join(', ');
-                                e.title += `[${entry.world}] ${entry.comment?.length ? entry.comment : entry.key.join(', ')}\n---\n${entry.content}`;
+                                title.textContent = displayWiTitle(entry);
+                                e.title = '[' + entry.world + '] ' + displayWiTitle(entry);
                             } else if (entry.type == 'mes') {
                                 const first = document.createElement('div'); {
                                     first.classList.add('stwii--first');
@@ -807,7 +975,7 @@ const init = ()=>{
         }
     };
 
-    // Build session tracking based on engine markers
+    // Raw console lines are transient; only a compact keyword report is saved.
     let stwiiCurrentBuild = null;
     // Per-run loop counts (for latest non-dry run), and dry-run flag
     let stwiiCurrentLoopCounts = null;
@@ -824,10 +992,8 @@ function startBuildSession() {
     }
 function endBuildSession() {
         if (!stwiiCurrentBuild) return;
-        if (!Array.isArray(chat_metadata.stwiiBuilds)) chat_metadata.stwiiBuilds = [];
-        chat_metadata.stwiiBuilds.push(stwiiCurrentBuild);
-        // Enforce retention: last 5 builds; purge global events for dropped builds
-        trimBuilds();
+        stwiiCurrentBuild.chatId = getCurrentChatId();
+        lastReportBuild = stwiiCurrentBuild;
         stwiiCurrentBuild = null;
     }
 
@@ -845,9 +1011,6 @@ function endBuildSession() {
         if (typeof a0 !== 'string') return null;
         const m = a0.match(/\[WI\]\s+Entry\s+(\d+)/);
         return m ? Number(m[1]) : null;
-    }
-    function ensureEventArray() {
-        if (!Array.isArray(chat_metadata.stwiiActivationEvents)) chat_metadata.stwiiActivationEvents = [];
     }
     function upsertDraft(uid, worldOpt) {
         // Prefer explicit world; fallback to last seen for this uid
@@ -1030,7 +1193,6 @@ function endBuildSession() {
             const placeholderKey = makeDraftKey(entryObj.uid, null);
             const d = activationDrafts.get(compKey) || activationDrafts.get(placeholderKey) || { primary: null, secondary: [], secondaryNon: [], logic: null };
 
-            ensureEventArray();
             // Fallback: if AND_ALL but no captured secondaries, include all entry secondaries
             const sec = (d.logic === 'AND_ALL' && (!d.secondary || d.secondary.length === 0) && Array.isArray(entryObj.keysecondary))
                 ? [...entryObj.keysecondary]
@@ -1059,8 +1221,6 @@ function endBuildSession() {
             };
 
             ev.runId = (stwiiCurrentBuild && stwiiCurrentBuild.runId) ? stwiiCurrentBuild.runId : (window.STWII?.currentRunId ?? null);
-            ensureEventArray();
-            pushBounded(chat_metadata.stwiiActivationEvents, ev, STWII.MAX_ACTIVATION_EVENTS);
 
             // Track per-loop event IDs if inside a loop
             if (Array.isArray(stwiiCurrentLoopEventIds) && stwiiActiveLoopIndex >= 0) {
@@ -1294,19 +1454,19 @@ window.STWII.destroy = function() {
         returns: 'opens popup',
         helpString: 'Show keywords that triggered WI entries (most frequent first) in a scrollable popup. Usage: /wi-report',
         callback: async () => {
-            // Prefer last complete build session; fallback to the last "Adding N entries" window; final fallback: all activation events
+            // Prefer the confirmed compact report; legacy logs remain readable.
+            const compact = chat_metadata.stwiiLastReport;
+            const freshMemory = lastReportBuild?.chatId === getCurrentChatId()
+                && lastReportBuild?.runId === compact?.runId ? lastReportBuild : null;
+            const legacyBuild = Array.isArray(chat_metadata.stwiiBuilds) ? chat_metadata.stwiiBuilds.at(-1) : null;
+            const lastBuild = freshMemory || compact || legacyBuild;
             let events = [];
-            const hasBuilds = Array.isArray(chat_metadata.stwiiBuilds) && chat_metadata.stwiiBuilds.length;
-            if (hasBuilds && Array.isArray(chat_metadata.stwiiBuilds.at(-1)?.added) && chat_metadata.stwiiBuilds.at(-1).added.length) {
-                events = chat_metadata.stwiiBuilds.at(-1).added;
+            if (Array.isArray(lastBuild?.added)) {
+                events = lastBuild.added;
             } else {
                 const all = Array.isArray(chat_metadata.stwiiActivationEvents) ? chat_metadata.stwiiActivationEvents : [];
                 const n = Number(chat_metadata.stwiiLastAddedCount);
-                if (Number.isFinite(n) && n > 0 && all.length >= n) {
-                    events = all.slice(-n);
-                } else {
-                    events = all;
-                }
+                events = Number.isFinite(n) && n > 0 && all.length >= n ? all.slice(-n) : all;
             }
 
             // Hide events from hidden lorebooks for non-admins (same rules as panel)
@@ -1349,7 +1509,6 @@ window.STWII.destroy = function() {
             }
 
             // Build keyword overrides from build logs (diagnostic parsing per loop)
-            const lastBuild = (Array.isArray(chat_metadata.stwiiBuilds) && chat_metadata.stwiiBuilds.length) ? chat_metadata.stwiiBuilds.at(-1) : null;
             const logLines = Array.isArray(lastBuild?.logs) ? lastBuild.logs : [];
             const loopRanges = [];
             if (logLines.length) {
@@ -1366,7 +1525,8 @@ window.STWII.destroy = function() {
                     }
                 }
             }
-            const idsByLoopDiag = Array.isArray(chat_metadata.stwiiLastLoopEntryIds) ? chat_metadata.stwiiLastLoopEntryIds : null;
+            const idsByLoopDiag = Array.isArray(lastBuild?.loopEntryIds) ? lastBuild.loopEntryIds :
+                (Array.isArray(chat_metadata.stwiiLastLoopEntryIds) ? chat_metadata.stwiiLastLoopEntryIds : null);
             const overrideById = new Map();
             if (idsByLoopDiag && idsByLoopDiag.length && loopRanges.length && logLines.length) {
                 for (let i = 0; i < idsByLoopDiag.length; i++) {
@@ -1468,7 +1628,7 @@ window.STWII.destroy = function() {
                 ? s.replace(/\s*-\s*S[0-9][0-9A-Za-z.\-]*\s*$/, '').trim()
                 : '';
             const fmtEntry = (e) => {
-                const c = sanitizeComment(e.comment ?? '');
+                const c = sanitizeComment(displayWiTitle({ ...e, key: e.keys }));
                 return `${e.world}:${e.uid}${c ? ` - ${c}` : ''}`;
             };
             const FORCE_ACTIVATED_KEYWORD = '(force activated)';
@@ -1542,12 +1702,14 @@ window.STWII.destroy = function() {
 
             // Loop breakdown (from latest non-dry run)
             // Show counts after applying hidden-book filtering
-            const loops = Array.isArray(chat_metadata.stwiiLastLoopCounts) ? chat_metadata.stwiiLastLoopCounts : [];
+            const loops = Array.isArray(lastBuild?.loopCounts) ? lastBuild.loopCounts :
+                    (Array.isArray(chat_metadata.stwiiLastLoopCounts) ? chat_metadata.stwiiLastLoopCounts : []);
             if (loops.length > 0) {
                 const loopDiv = document.createElement('div');
                 loopDiv.classList.add('stwii-report-summary');
 
-                const idsByLoop = Array.isArray(chat_metadata.stwiiLastLoopEntryIds) ? chat_metadata.stwiiLastLoopEntryIds : null;
+                const idsByLoop = Array.isArray(lastBuild?.loopEntryIds) ? lastBuild.loopEntryIds :
+                        (Array.isArray(chat_metadata.stwiiLastLoopEntryIds) ? chat_metadata.stwiiLastLoopEntryIds : null);
                 const validIds = new Set(events.map(ev => `${ev.world}:${ev.uid}`));
 
                 const pieces = loops.map((n, i) => {
@@ -1630,7 +1792,8 @@ window.STWII.destroy = function() {
 
             // Per-loop sections (list entries by loop using last non-dry-run loop counts)
             (function renderLoops() {
-                const loops = Array.isArray(chat_metadata.stwiiLastLoopCounts) ? chat_metadata.stwiiLastLoopCounts : [];
+                const loops = Array.isArray(lastBuild?.loopCounts) ? lastBuild.loopCounts :
+                    (Array.isArray(chat_metadata.stwiiLastLoopCounts) ? chat_metadata.stwiiLastLoopCounts : []);
                 if (!Array.isArray(loops) || loops.length === 0) return;
 
                 const total = loops.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
@@ -1647,7 +1810,8 @@ window.STWII.destroy = function() {
                     container.append(header);
 
                     let list = [];
-                    const idsByLoop = Array.isArray(chat_metadata.stwiiLastLoopEntryIds) ? chat_metadata.stwiiLastLoopEntryIds : null;
+                    const idsByLoop = Array.isArray(lastBuild?.loopEntryIds) ? lastBuild.loopEntryIds :
+                        (Array.isArray(chat_metadata.stwiiLastLoopEntryIds) ? chat_metadata.stwiiLastLoopEntryIds : null);
                     if (idsByLoop && Array.isArray(idsByLoop[i]) && idsByLoop[i]?.length === cnt) {
                         const byId = new Map(events.map(ev => [`${ev.world}:${ev.uid}`, ev]));
                         list = idsByLoop[i].map(id => byId.get(id)).filter(Boolean);
