@@ -282,8 +282,10 @@ const init = ()=>{
         trigger.classList.add('fa-solid', 'fa-fw', 'fa-book-atlas');
         trigger.title = 'Active WI\n---\nright click for options';
         trigger.addEventListener('click', ()=>{
+            // Entries are already rendered when the real generation is processed.
+            // Opening the book should be an immediate visibility toggle, not a
+            // second pass through chat history and every World Info entry.
             panel.classList.toggle('stwii--isActive');
-            if (panel.classList.contains('stwii--isActive') && currentEntryList.length) updatePanel(currentEntryList);
             requestAnimationFrame(ensurePanelsVisible);
         });
         trigger.addEventListener('contextmenu', (evt)=>{
@@ -688,9 +690,33 @@ const init = ()=>{
     let currentChat = [];
     let pendingEntries = [];
     let generationSerial = 0;
+    let realGenerationInProgress = false;
     let lastReportBuild = null;
-    const resetDisplayedEntries = () => {
+
+    const beginRealGeneration = (type, options, dryRun) => {
+        // Token-count passes and background/quiet generations aren't the
+        // on-screen reply. Neither should replace the most recent displayed
+        // reply's World Info. A quietToLoud generation *is* user-visible.
+        if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
         generationSerial++;
+        realGenerationInProgress = true;
+        pendingEntries = [];
+        lastReportBuild = null;
+        stwiiCurrentBuild = null;
+        activationDrafts.clear();
+        lastWorldByUid.clear();
+        stwiiCurrentLoopCounts = null;
+        stwiiCurrentLoopEntryIds = null;
+        stwiiCurrentLoopEventIds = null;
+        stwiiActiveLoopIndex = -1;
+        // Keep the previous completed result visible until this real run
+        // resolves. Do not show an empty list mid-generation.
+    };
+
+    eventSource.on(event_types.GENERATION_STARTED, beginRealGeneration);
+    eventSource.on(event_types.CHAT_CHANGED, () => {
+        generationSerial++;
+        realGenerationInProgress = false;
         pendingEntries = [];
         currentEntryList = [];
         lastReportBuild = null;
@@ -703,33 +729,36 @@ const init = ()=>{
         stwiiActiveLoopIndex = -1;
         panel.textContent = 'No active entries';
         void updateBadge([]);
-    };
-    eventSource.on(event_types.GENERATION_STARTED, resetDisplayedEntries);
-    eventSource.on(event_types.CHAT_CHANGED, () => {
-        resetDisplayedEntries();
-        lastReportBuild = null;
     });
 
     // Activation events describe scan candidates, not actual final prompt insertion.
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, async(entryList) => {
+        if (!realGenerationInProgress) return;
         const serial = generationSerial;
         const filtered = entryList.filter(e => e?.disable !== true);
-        for (const entry of filtered) {
-            entry.type = 'wi';
-            entry.sticky = parseInt(/**@type {string}*/(await SlashCommandParser.commands['wi-get-timed-effect'].callback(
-                {
-                    effect: 'sticky', format: 'number', file: String(entry.world),
-                    _scope: null, _abortController: null,
-                }, entry.uid,
-            )));
-        }
-        if (serial !== generationSerial) return;
+        // Capture first, before optional sticky slash commands are awaited.
+        // A slow or failed sticky query cannot erase the activation list.
         pendingEntries = filtered;
-        panel.textContent = 'Checking final prompt...';
+        for (const entry of filtered) entry.type = 'wi';
+        for (const entry of filtered) {
+            try {
+                entry.sticky = parseInt(/**@type {string}*/(await SlashCommandParser.commands['wi-get-timed-effect'].callback(
+                    {
+                        effect: 'sticky', format: 'number', file: String(entry.world),
+                        _scope: null, _abortController: null,
+                    }, entry.uid,
+                )));
+            } catch {
+                entry.sticky = 0;
+            }
+            if (serial !== generationSerial) return;
+        }
     });
 
     eventSource.on(event_types.GENERATE_AFTER_DATA, (data, dryRun) => {
-        if (dryRun) return;
+        // Ignore dry runs and repeated/later hooks for an already completed run.
+        if (dryRun || !realGenerationInProgress) return;
+        realGenerationInProgress = false;
         const included = confirmedWiEntries(pendingEntries, data);
         pendingEntries = [];
         currentEntryList = [...included];
