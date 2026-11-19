@@ -1,7 +1,7 @@
 import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
 import { translate as stTranslate } from '../../../i18n.js';
 import { metadata_keys } from '../../../authors-note.js';
-import { extension_settings } from '../../../extensions.js';
+import { extension_settings, getContext } from '../../../extensions.js';
 import { promptManager } from '../../../openai.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
@@ -210,6 +210,83 @@ function displayWiBody(entry) {
     return usable && typeof record.text==='string' && record.text.trim()
         ? record.text : source;
 }
+
+// Cherry&Solti RT stores read-only translation results in one file per lorebook.
+// No writes to RT or world info, no persistent DOM observer and no polling.
+const rtBookCache = new Map();
+const RT_BOOK_CACHE_LIMIT = 8;
+function rtSourceHash(text) {
+    const value = String(text ?? '').replace(/\s+/g, ' ').trim().toLowerCase();
+    const fnv1a = (str, seed) => {
+        let hash = seed >>> 0;
+        for (let i = 0; i < str.length; i++) {
+            const code = str.charCodeAt(i);
+            hash = Math.imul(hash ^ (code & 0xff), 0x01000193) >>> 0;
+            hash = Math.imul(hash ^ ((code >>> 8) & 0xff), 0x01000193) >>> 0;
+        }
+        return hash >>> 0;
+    };
+    const partA = fnv1a(value, 0x811c9dc5);
+    const partB = fnv1a(value + '\u0001cslt', 0x9e3779b1);
+    return partA.toString(16).padStart(8, '0') + partB.toString(16).padStart(8, '0');
+}
+async function rtTranslationsForWorld(world) {
+    const rtSettings = extension_settings['lorebook-translator'];
+    if (!rtSettings || !world) return null;
+    const index = rtSettings.fileIndex?.[world];
+    // RT may switch to legacy settings storage if file writes fail.
+    if (rtSettings.storageMode === 'legacy') {
+        return rtSettings.cache && typeof rtSettings.cache === 'object' ? rtSettings.cache : null;
+    }
+
+    if (index?.file) {
+        // Accept only Cherry&Solti's generated hash filenames.
+        const filename = String(index.file);
+        if (!/^cslt_[0-9a-f]{16}\.json$/i.test(filename)) return null;
+        const version = filename + ':' + String(index.updatedAt ?? '');
+        const cached = rtBookCache.get(world);
+        if (cached?.version === version) return cached.records;
+        try {
+            const headers = getContext?.()?.getRequestHeaders?.();
+            const response = await fetch('/user/files/' + filename, {
+                method: 'GET',
+                credentials: 'same-origin',
+                ...(headers ? { headers } : {}),
+                cache: 'no-store',
+            });
+            if (!response.ok) return null;
+            const document = await response.json();
+            if (document?.world !== world || !document.cache || typeof document.cache !== 'object') return null;
+            const records = document.cache;
+            // Cache only per lorebook, on demand. RT updates fileIndex.updatedAt when it saves.
+            rtBookCache.delete(world);
+            rtBookCache.set(world, { version, records });
+            while (rtBookCache.size > RT_BOOK_CACHE_LIMIT) {
+                rtBookCache.delete(rtBookCache.keys().next().value);
+            }
+            return records;
+        } catch {
+            // If RT's file is not readable, show the original rather than stale legacy data.
+            return null;
+        }
+    }
+
+    // Older RT versions store the data directly in extension settings.
+    return rtSettings.cache && typeof rtSettings.cache === 'object' ? rtSettings.cache : null;
+}
+async function rtTranslatedBody(entry) {
+    const world = String(entry?.world ?? '');
+    const uid = String(entry?.uid ?? '');
+    const records = await rtTranslationsForWorld(world);
+    const record = records?.[world + '::' + uid];
+    if (typeof record?.content !== 'string' || !record.content.trim() || record.truncated === true) return null;
+
+    // RT saves src.c for the source body. Refuse stale translations after edits.
+    const source = String(entry?.content ?? '');
+    if (!source.trim() || !record.src?.c || rtSourceHash(source) !== record.src.c) return null;
+    return record.content;
+}
+
 let currentLoreViewer=null;
 function closeLoreViewer() {
     const viewer=currentLoreViewer;
@@ -266,7 +343,16 @@ async function showLoreViewer(entry) {
         const current=data?.entries?.[Number(entry.uid)];
         const full=current ? {...current,world:entry.world,uid:entry.uid} : entry;
         title.textContent=displayWiTitle(full);
-        body.value=displayWiBody(full);
+        const source=String(full?.content ?? '');
+        const managerText=displayWiBody(full);
+        body.value=managerText;
+        // Prefer an existing, current Lorebook Manager translation. RT supplies
+        // the body only when the manager has no usable translated body.
+        if (managerText === source) {
+            const rtText = await rtTranslatedBody(full);
+            if (currentLoreViewer?.overlay !== overlay) return;
+            if (typeof rtText === 'string') body.value = rtText;
+        }
     } catch {
         if (currentLoreViewer?.overlay!==overlay) return;
         title.textContent=displayWiTitle(entry);
