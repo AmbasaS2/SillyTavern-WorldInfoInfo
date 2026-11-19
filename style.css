@@ -329,6 +329,31 @@
   background-color: var(--SmartThemeBotMesBlurTintColor, var(--SmartThemeBlurTintColor, transparent));
   color: inherit;
 }
+/* Display decorated title and bracketed section labels in the reader only. */
+.stwii--reader-body :is(h3,h4) {
+  font-family: inherit;
+  font-size: 1em;
+  line-height: inherit;
+  margin: .6em 0 .5em;
+  overflow-wrap: anywhere;
+}
+.stwii--reader-body h3 {
+  padding: 0 0 .35em;
+  border-bottom: 1px solid color-mix(in srgb, var(--SmartThemeBorderColor, currentColor) 45%, transparent);
+}
+.stwii--reader-body h4 {
+  font-size: .95em;
+  color: var(--SmartThemeUnderlineColor, inherit);
+}
+/* Avoid theme-default list indentation consuming mobile reading width. */
+.stwii--reader-body :is(ul,ol) {
+  margin-inline: 0 !important;
+  padding-inline-start: 1.25em !important;
+}
+.stwii--reader-body li {
+  margin-inline: 0 !important;
+  padding-inline-start: 0 !important;
+}
 /* Reuse native .mes_text Markdown typography, including theme-specific rules.
    Keep only scrolling/layout protections here; no forced font, size or weight. */
 .stwii--reader-body :is(img,video,table) { max-width: 100%; }

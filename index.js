@@ -313,10 +313,40 @@ const wiLoreMarkdown = new showdown.Converter({
     strikethrough: true,
     underline: true,
 });
+// Presentation-only normalization of decorative lore headings. Source and
+// translated records are never rewritten; fenced code blocks are preserved.
+function formatLoreReaderMarkdown(source) {
+    const lines = String(source ?? '').split(/\r?\n/);
+    let fenceChar = '', fenceLength = 0;
+    for (let i = 0; i < lines.length; i++) {
+        const fence = lines[i].match(/^ {0,3}(\x60{3,}|~{3,})/);
+        if (fence) {
+            if (!fenceChar) {
+                fenceChar = fence[1][0];
+                fenceLength = fence[1].length;
+            } else if (fence[1][0] === fenceChar && fence[1].length >= fenceLength) {
+                fenceChar = '';
+                fenceLength = 0;
+            }
+            continue;
+        }
+        if (fenceChar) continue;
+        const decorated = lines[i].match(/^ {0,3}={3,}[ \t]*(.+?)[ \t]*={3,}[ \t]*$/);
+        if (decorated && decorated[1].trim()) {
+            lines[i] = '### ' + decorated[1].trim();
+            continue;
+        }
+        const bracketed = lines[i].match(/^ {0,3}\[([^\[\]\n]{3,100})\][ \t]*$/);
+        if (bracketed && bracketed[1].trim()) {
+            lines[i] = '#### ' + bracketed[1].trim();
+        }
+    }
+    return lines.join('\n');
+}
 function renderLorePreview(target, source) {
     const content = String(source ?? '');
     try {
-        target.innerHTML = DOMPurify.sanitize(wiLoreMarkdown.makeHtml(content), {
+        target.innerHTML = DOMPurify.sanitize(wiLoreMarkdown.makeHtml(formatLoreReaderMarkdown(content)), {
             USE_PROFILES: { html: true },
             FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'input', 'select', 'button', 'textarea'],
             FORBID_ATTR: ['style'],
@@ -371,7 +401,6 @@ function matchLoreReaderChatTypography(dialog, body) {
 // compact /wi-report event. Do not rescan lore, query vectors, or parse logs
 // when the reader opens. A missing event is not evidence of vector activation.
 function describeLoreActivation(entry) {
-    const configured = wiT('reader.mode.' + getStrategy(entry));
     const events = chat_metadata.stwiiLastReport?.added;
     const ev = Array.isArray(events) ? events.find(item =>
         item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null;
@@ -383,8 +412,8 @@ function describeLoreActivation(entry) {
         const hasKeywordEvidence = primary || ['AND_ANY', 'AND_ALL', 'NOT_ANY', 'NOT_ALL'].includes(logic);
         if (hasKeywordEvidence) {
             let cause = wiT('reader.reason.keyword');
-            if (primary) cause += ': ' + primary;
-            if (secondary.length) cause += ' · ' + wiT('reader.reason.secondary') + ': ' + secondary.join(', ');
+            if (primary) cause += ' · ' + primary;
+            if (secondary.length) cause += ' · ' + wiT('reader.reason.secondary') + ' · ' + secondary.join(', ');
             else if (logic === 'NOT_ANY' || logic === 'NOT_ALL') cause += ' · ' + logic.replace('_', ' ');
             causes.push(cause);
         }
@@ -396,9 +425,7 @@ function describeLoreActivation(entry) {
             causes.push(wiT('reader.reason.external'));
         }
     }
-    return wiT('reader.mode.label') + ': ' + configured
-        + ' · ' + wiT('reader.reason.label') + ': '
-        + (causes.length ? causes.join(' + ') : wiT('reader.reason.unknown'));
+    return causes.length ? causes.join(' + ') : wiT('reader.reason.unknown');
 }
 
 let currentLoreViewer=null;
