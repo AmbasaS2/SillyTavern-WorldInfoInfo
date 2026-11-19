@@ -1085,6 +1085,9 @@ const init = ()=>{
     let realGenerationInProgress = false;
     let lastReportBuild = null;
     let lastRenderedGenerationEntries = null;
+    // This is the exact number of messages used by the last real WI scan.
+    // SillyTavern already logs it; no chat/history scan is needed.
+    let stwiiCurrentScanMessageCount = null;
     // Build the list as soon as ordinary lore activates, just like the
     // original extension. Delay only outlet entries until prompt verification.
     function renderGenerationEntries(list) {
@@ -1106,6 +1109,7 @@ const init = ()=>{
         generationSerial++;
         realGenerationInProgress = true;
         pendingEntries = [];
+        stwiiCurrentScanMessageCount = null;
         lastReportBuild = null;
         stwiiCurrentBuild = null;
         activationDrafts.clear();
@@ -1124,6 +1128,7 @@ const init = ()=>{
         generationSerial++;
         realGenerationInProgress = false;
         pendingEntries = [];
+        stwiiCurrentScanMessageCount = null;
         currentEntryList = [];
         lastRenderedGenerationEntries = null;
         lastReportBuild = null;
@@ -1140,34 +1145,28 @@ const init = ()=>{
     });
 
     // Activation events describe scan candidates, not actual final prompt insertion.
-    eventSource.on(event_types.WORLD_INFO_ACTIVATED, async(entryList) => {
+    eventSource.on(event_types.WORLD_INFO_ACTIVATED, (entryList) => {
         if (!realGenerationInProgress) return;
-        const serial = generationSerial;
+
+        // SillyTavern has already checked and stored timed effects during this
+        // WI scan. Read its in-memory end count directly rather than invoking a
+        // slash command that reloads the entire lorebook for EVERY entry.
+        const effectByEntry = chat_metadata.timedWorldInfo?.sticky;
+        const scanned = stwiiCurrentScanMessageCount;
         const filtered = entryList.filter(e => e?.disable !== true)
-            .map(entry => ({ ...entry, type: 'wi', sticky: 0 }));
+            .map(entry => {
+                const effect = effectByEntry?.[String(entry.world) + '.' + String(entry.uid)];
+                const end = Number(effect?.end);
+                const remaining = Number.isInteger(scanned) && scanned >= 0
+                    && Number.isFinite(end) ? Math.max(0, Math.trunc(end - scanned)) : 0;
+                return { ...entry, type: 'wi', sticky: remaining };
+            });
         pendingEntries = filtered;
 
-        // This event arrives before GENERATE_AFTER_DATA. Pre-render only
-        // ordinary, nonempty entries; a triggered outlet is NOT proof that
-        // its named outlet was used in the final request.
+        // Keep the instant list update and verify outlets only in the final prompt.
         const immediatelyVisible = filtered.filter(entry =>
             entry.position !== world_info_position.outlet && !!renderedWiContent(entry));
-        if (serial === generationSerial) renderGenerationEntries(immediatelyVisible);
-
-        // Optional sticky metadata may take time. Do not make the list wait for it.
-        for (const entry of filtered) {
-            try {
-                entry.sticky = parseInt(/**@type {string}*/(await SlashCommandParser.commands['wi-get-timed-effect'].callback(
-                    {
-                        effect: 'sticky', format: 'number', file: String(entry.world),
-                        _scope: null, _abortController: null,
-                    }, entry.uid,
-                ))) || 0;
-            } catch {
-                entry.sticky = 0;
-            }
-            if (serial !== generationSerial) return;
-        }
+        renderGenerationEntries(immediatelyVisible);
     });
 
     eventSource.on(event_types.GENERATE_AFTER_DATA, (data, dryRun) => {
@@ -1777,6 +1776,11 @@ function endBuildSession() {
         STWII.origLog = console.log;
     const original_debug = console.debug;
     console.debug = function(...args) {
+        const firstArg = args[0];
+        if (typeof firstArg !== 'string' || !(
+            firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
+            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
+        )) return original_debug.apply(console, args);
         // capture WI activation details
         try { handleWiDebugArgs(args); } catch {}
 
@@ -1794,6 +1798,9 @@ function endBuildSession() {
             // Detect WI scan start to reset loop counts; track DRY RUNs
             if (asText.includes('[WI] --- START WI SCAN')) {
                 stwiiDryRunActive = asText.includes('(DRY RUN)');
+                const countMatch = asText.match(/START WI SCAN \(on (\d+) messages/);
+                stwiiCurrentScanMessageCount = !stwiiDryRunActive && countMatch
+                    ? Number(countMatch[1]) : null;
                 stwiiCurrentLoopCounts = [];
                 stwiiCurrentLoopEntryIds = [];
                 stwiiCurrentLoopEventIds = [];
@@ -1838,10 +1845,15 @@ function endBuildSession() {
         } catch {}
 
         // No UI changes here: zero-entry and dry-run debug logs are not definitive.
-        return original_debug.bind(console)(...args);
+        return original_debug.apply(console, args);
     };
     const original_log = console.log;
     console.log = function(...args) {
+        const firstArg = args[0];
+        if (typeof firstArg !== 'string' || !(
+            firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
+            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
+        )) return original_log.apply(console, args);
         // capture WI activation details (just in case)
         try { handleWiDebugArgs(args); } catch {}
 
@@ -1873,6 +1885,9 @@ function endBuildSession() {
             // Detect WI scan start to reset loop counts; track DRY RUNs
             if (asText.includes('[WI] --- START WI SCAN')) {
                 stwiiDryRunActive = asText.includes('(DRY RUN)');
+                const countMatch = asText.match(/START WI SCAN \(on (\d+) messages/);
+                stwiiCurrentScanMessageCount = !stwiiDryRunActive && countMatch
+                    ? Number(countMatch[1]) : null;
                 stwiiCurrentLoopCounts = [];
                 stwiiCurrentLoopEntryIds = [];
             }
@@ -1922,7 +1937,7 @@ function endBuildSession() {
         } catch {}
 
         // No UI changes here: zero-entry and dry-run debug logs are not definitive.
-        return original_log.bind(console)(...args);
+        return original_log.apply(console, args);
     };
     STWII.unpatchConsole = function() {
         try { console.debug = STWII.origDebug; } catch {}
