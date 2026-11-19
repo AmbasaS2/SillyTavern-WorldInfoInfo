@@ -38,6 +38,19 @@ const WI_UI_EN = {
     "reader.close": "Close",
     "reader.body": "Lore text (read-only)",
     "reader.loading": "Loading lore…",
+    "reader.mode.label": "Configured",
+    "reader.mode.constant": "Always active",
+    "reader.mode.normal": "Keyword",
+    "reader.mode.vectorized": "Vectorized",
+    "reader.reason.label": "Activated by",
+    "reader.reason.unknown": "Reason not recorded",
+    "reader.reason.keyword": "Keyword match",
+    "reader.reason.vector": "Vector search",
+    "reader.reason.constant": "Always active",
+    "reader.reason.sticky": "Sticky continuation",
+    "reader.reason.external": "External activation",
+    "reader.reason.decorator": "@@activate directive",
+    "reader.reason.secondary": "Secondary condition",
     "command.triggered.returns": "last displayed lore entries as JSON",
     "command.triggered.help": "Return the lore entries shown for the last visible generation. Usage: /wi-triggered",
     "command.reset.returns": "resets the book button position",
@@ -353,6 +366,41 @@ function matchLoreReaderChatTypography(dialog, body) {
     for (const { property, value } of titleChanges) dialog.style.setProperty(property, value);
 }
 
+
+// Explain the most recent confirmed activation using the already-captured
+// compact /wi-report event. Do not rescan lore, query vectors, or parse logs
+// when the reader opens. A missing event is not evidence of vector activation.
+function describeLoreActivation(entry) {
+    const configured = wiT('reader.mode.' + getStrategy(entry));
+    const events = chat_metadata.stwiiLastReport?.added;
+    const ev = Array.isArray(events) ? events.find(item =>
+        item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null;
+    const causes = [];
+    if (ev) {
+        const logic = String(ev.logic || '');
+        const primary = typeof ev.primary === 'string' ? ev.primary.trim() : '';
+        const secondary = Array.isArray(ev.secondary) ? ev.secondary.filter(x => typeof x === 'string' && x.trim()) : [];
+        const hasKeywordEvidence = primary || ['AND_ANY', 'AND_ALL', 'NOT_ANY', 'NOT_ALL'].includes(logic);
+        if (hasKeywordEvidence) {
+            let cause = wiT('reader.reason.keyword');
+            if (primary) cause += ': ' + primary;
+            if (secondary.length) cause += ' · ' + wiT('reader.reason.secondary') + ': ' + secondary.join(', ');
+            else if (logic === 'NOT_ANY' || logic === 'NOT_ALL') cause += ' · ' + logic.replace('_', ' ');
+            causes.push(cause);
+        }
+        if (ev.vectorConfirmed === true) causes.push(wiT('reader.reason.vector'));
+        if (logic === 'CONSTANT') causes.push(wiT('reader.reason.constant'));
+        if (logic === 'STICKY') causes.push(wiT('reader.reason.sticky'));
+        if (logic === 'DECORATOR') causes.push(wiT('reader.reason.decorator'));
+        if ((logic === 'FORCE_ACTIVATE' || logic === 'EXTERNAL') && ev.vectorConfirmed !== true) {
+            causes.push(wiT('reader.reason.external'));
+        }
+    }
+    return wiT('reader.mode.label') + ': ' + configured
+        + ' · ' + wiT('reader.reason.label') + ': '
+        + (causes.length ? causes.join(' + ') : wiT('reader.reason.unknown'));
+}
+
 let currentLoreViewer=null;
 function closeLoreViewer() {
     const viewer=currentLoreViewer;
@@ -387,6 +435,10 @@ async function showLoreViewer(entry) {
     close.className='stwii--reader-close';
     close.setAttribute('aria-label',wiT('reader.close'));
     close.textContent='×';
+    const activation=document.createElement('div');
+    activation.className='stwii--reader-activation';
+    // Reserve the final metadata line before the modal is measured/positioned.
+    activation.textContent=describeLoreActivation(entry);
     const body=document.createElement('div');
     // Reuse the same Markdown typography and theme rules as chat messages.
     body.className='stwii--reader-body mes_text';
@@ -395,7 +447,7 @@ async function showLoreViewer(entry) {
     body.tabIndex=0;
     body.textContent=wiT('reader.loading');
     header.append(title,close);
-    dialog.append(header,body);
+    dialog.append(header,activation,body);
     overlay.append(dialog);
     const previousFocus=document.activeElement;
 
@@ -1030,6 +1082,7 @@ const init = ()=>{
         lastReportBuild = null;
         stwiiCurrentBuild = null;
         activationDrafts.clear();
+        vectorActivatedIds.clear();
         lastWorldByUid.clear();
         stwiiCurrentLoopCounts = null;
         stwiiCurrentLoopEntryIds = null;
@@ -1049,6 +1102,7 @@ const init = ()=>{
         lastReportBuild = null;
         stwiiCurrentBuild = null;
         activationDrafts.clear();
+        vectorActivatedIds.clear();
         lastWorldByUid.clear();
         stwiiCurrentLoopCounts = null;
         stwiiCurrentLoopEntryIds = null;
@@ -1411,6 +1465,7 @@ function endBuildSession() {
 
     // WI activation log capture (no changes to world-info.js)
     const activationDrafts = new Map();
+    const vectorActivatedIds = new Set();
     // Track last seen world for a given numeric UID (engine logs sometimes omit the world on follow-up lines)
     const lastWorldByUid = new Map();
 
@@ -1445,6 +1500,19 @@ function endBuildSession() {
     function handleWiDebugArgs(args) {
         if (!args || args.length === 0) return;
         const a0 = args[0];
+
+        // The vector extension reports its own matches before issuing the
+        // generic force-activation event. An entry's vectorized flag alone
+        // does NOT prove that its vector search matched on this generation.
+        if (typeof a0 === 'string' && a0.startsWith('Vectors: Activated ')
+            && Array.isArray(args[1]) && /\d+ WI entries$/.test(a0)) {
+            for (const matched of args[1]) {
+                if (typeof matched?.world === 'string' && Number.isFinite(Number(matched.uid))) {
+                    vectorActivatedIds.add(makeDraftKey(matched.uid, matched.world));
+                }
+            }
+            return;
+        }
 
         if (typeof a0 === 'string' && /\[\s*WI\s*\]\s+WORLDINFO_FORCE_ACTIVATE\s+added entry/i.test(a0)) {
             const entryObj = args[1];
@@ -1549,6 +1617,29 @@ function endBuildSession() {
             }
         } catch {}
 
+        // Other proven activation paths emitted by SillyTavern itself.
+        if (a1 === 'activated because active sticky') {
+            upsertDraft(uid).logic = 'STICKY';
+            return;
+        }
+        if (a1 === 'activated by @@activate decorator') {
+            upsertDraft(uid).logic = 'DECORATOR';
+            return;
+        }
+        if (a1 === 'externally activated') {
+            const d = upsertDraft(uid);
+            d.logic = d.logic ?? 'EXTERNAL';
+            return;
+        }
+
+        // Selective entries report the primary match as a separate console
+        // argument, before their AND/NOT secondary result.
+        if (a1 === 'Entry with primary key match' && typeof a2 === 'string') {
+            const d = upsertDraft(uid);
+            d.primary = a2;
+            return;
+        }
+
         // Primary matched
         if (a1 === 'activated by primary key match') {
             const d = upsertDraft(uid);
@@ -1621,6 +1712,8 @@ function endBuildSession() {
                 primary: d.primary,
                 secondary: sec,
                 logic: d.logic,
+                // Proven by the vector extension's own selected-entry log.
+                vectorConfirmed: vectorActivatedIds.has(compKey),
                 reason: (() => {
                     if (entryObj.constant === true) return 'constant';
                     if (d.logic === 'FORCE_ACTIVATE') return 'force_activate';

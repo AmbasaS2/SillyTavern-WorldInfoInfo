@@ -302,6 +302,16 @@
   flex: 0 0 auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .stwii--reader-dialog.stwii--reader-dragging .stwii--reader-header { cursor: grabbing; }
+.stwii--reader-activation {
+  flex: 0 0 auto;
+  min-width: 0;
+  margin-top: -6px;
+  font-size: .85em;
+  line-height: 1.4;
+  opacity: .82;
+  overflow-wrap: anywhere;
+}
+.stwii--reader-activation:empty { display: none; }
 .stwii--reader-title { font: inherit; min-width: 0; overflow-wrap: anywhere; }
 .stwii--reader-close {
   flex: 0 0 32px; height: 32px; font-size: 24px; line-height: 1;
