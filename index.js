@@ -969,6 +969,19 @@ const init = ()=>{
     let generationSerial = 0;
     let realGenerationInProgress = false;
     let lastReportBuild = null;
+    let lastRenderedGenerationEntries = null;
+    // Build the list as soon as ordinary lore activates, just like the
+    // original extension. Delay only outlet entries until prompt verification.
+    function renderGenerationEntries(list) {
+        const signature = generationSerial + ':' + list.map(entry =>
+            String(entry.world) + '§§§' + String(entry.uid) + '§§§' + String(entry.sticky || 0)).join('|');
+        currentEntryList = [...list];
+        if (signature === lastRenderedGenerationEntries) return;
+        lastRenderedGenerationEntries = signature;
+        void updateBadge(list.map(entry => String(entry.world) + '§§§' + String(entry.uid)));
+        if (list.length) updatePanel(list, true);
+        else panel.textContent = '?';
+    }
 
     const beginRealGeneration = (type, options, dryRun) => {
         // Token-count passes and background/quiet generations aren't the
@@ -996,6 +1009,7 @@ const init = ()=>{
         realGenerationInProgress = false;
         pendingEntries = [];
         currentEntryList = [];
+        lastRenderedGenerationEntries = null;
         lastReportBuild = null;
         stwiiCurrentBuild = null;
         activationDrafts.clear();
@@ -1012,11 +1026,18 @@ const init = ()=>{
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, async(entryList) => {
         if (!realGenerationInProgress) return;
         const serial = generationSerial;
-        const filtered = entryList.filter(e => e?.disable !== true);
-        // Capture first, before optional sticky slash commands are awaited.
-        // A slow or failed sticky query cannot erase the activation list.
+        const filtered = entryList.filter(e => e?.disable !== true)
+            .map(entry => ({ ...entry, type: 'wi', sticky: 0 }));
         pendingEntries = filtered;
-        for (const entry of filtered) entry.type = 'wi';
+
+        // This event arrives before GENERATE_AFTER_DATA. Pre-render only
+        // ordinary, nonempty entries; a triggered outlet is NOT proof that
+        // its named outlet was used in the final request.
+        const immediatelyVisible = filtered.filter(entry =>
+            entry.position !== world_info_position.outlet && !!renderedWiContent(entry));
+        if (serial === generationSerial) renderGenerationEntries(immediatelyVisible);
+
+        // Optional sticky metadata may take time. Do not make the list wait for it.
         for (const entry of filtered) {
             try {
                 entry.sticky = parseInt(/**@type {string}*/(await SlashCommandParser.commands['wi-get-timed-effect'].callback(
@@ -1024,7 +1045,7 @@ const init = ()=>{
                         effect: 'sticky', format: 'number', file: String(entry.world),
                         _scope: null, _abortController: null,
                     }, entry.uid,
-                )));
+                ))) || 0;
             } catch {
                 entry.sticky = 0;
             }
@@ -1038,10 +1059,9 @@ const init = ()=>{
         realGenerationInProgress = false;
         const included = confirmedWiEntries(pendingEntries, data);
         pendingEntries = [];
-        currentEntryList = [...included];
-        void updateBadge(included.map(it => String(it.world) + '§§§' + String(it.uid)));
-        if (included.length) updatePanel(included, true);
-        else panel.textContent = '?';
+        // Repaint only if an outlet is confirmed or sticky metadata changed;
+        // otherwise keep the already-built DOM and instant button response.
+        renderGenerationEntries(included);
 
         // Persist one compact report; never persist the intercepted console logs.
         const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
