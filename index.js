@@ -542,7 +542,7 @@ const init = ()=>{
     }
     const panel = document.createElement('div'); {
         panel.classList.add('stwii--panel');
-        panel.textContent = wiT('panel.waiting');
+        panel.textContent = '?';
         document.body.append(panel);
     }
     const configPanel = document.createElement('div'); {
@@ -718,7 +718,7 @@ const init = ()=>{
 
     function placePanelNearTrigger(el) {
         const bounds = getVisibleBounds();
-        const margin = 6;
+        const margin = 3;
         const maxWidth = Math.max(1, Math.min(bounds.width * 0.8, bounds.width - 2 * margin));
         const maxHeight = Math.max(1, Math.min(bounds.height * 0.7, bounds.height - 2 * margin));
         el.style.setProperty('max-width', maxWidth + 'px', 'important');
@@ -736,11 +736,10 @@ const init = ()=>{
             : left >= bounds.left + margin ? left
             : clamp(right, bounds.left + margin, bounds.right - pw - margin);
 
-        const above = tr.top - ph - margin;
-        const below = tr.bottom + margin;
-        const y = above >= bounds.top + margin ? above
-            : below + ph <= bounds.bottom - margin ? below
-            : clamp(tr.top, bounds.top + margin, bounds.bottom - ph - margin);
+        // Align the panel's center with the icon, rather than placing it a
+        // whole panel-height above the icon. Clamp for small viewports.
+        const y = clamp(tr.top + (tr.height - ph) / 2,
+            bounds.top + margin, bounds.bottom - ph - margin);
 
         el.style.position = 'fixed';
         el.style.left = x + 'px';
@@ -965,7 +964,7 @@ const init = ()=>{
         stwiiCurrentLoopEntryIds = null;
         stwiiCurrentLoopEventIds = null;
         stwiiActiveLoopIndex = -1;
-        panel.textContent = wiT('panel.none');
+        panel.textContent = '?';
         void updateBadge([]);
     });
 
@@ -1002,7 +1001,7 @@ const init = ()=>{
         currentEntryList = [...included];
         void updateBadge(included.map(it => String(it.world) + '§§§' + String(it.uid)));
         if (included.length) updatePanel(included, true);
-        else panel.textContent = wiT('panel.none');
+        else panel.textContent = '?';
 
         // Persist one compact report; never persist the intercepted console logs.
         const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
