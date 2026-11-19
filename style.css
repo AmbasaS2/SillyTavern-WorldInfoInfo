@@ -280,8 +280,10 @@
   background: rgba(0,0,0,.52);
 }
 .stwii--reader-dialog {
-  font-family: inherit;
-  font-size: inherit;
+  /* The viewer is outside <body> for positioning. Use SillyTavern's live
+     theme variables, not a one-time snapshot of an individual message. */
+  font-family: var(--mainFontFamily, inherit);
+  font-size: var(--mainFontSize, inherit);
   display: flex; flex-direction: column; gap: 12px;
   box-sizing: border-box; width: min(660px, 100%); max-height: min(82dvh, 900px);
   min-width: 0; padding: 16px;

@@ -313,22 +313,6 @@ function renderLorePreview(target, source) {
         target.textContent = content;
     }
 }
-function inheritLoreReaderFont(dialog) {
-    // This viewer lives outside <body> to escape theme transforms, so its
-    // inherited typography is otherwise different from the chat. Match an
-    // actual character message, not an arbitrary/system message or a fixed
-    // font size. No polling: this runs only when a lore reader opens.
-    const sample = document.querySelector('#chat .mes.last_mes[is_user="false"]:not(.smallSysMes) .mes_text')
-        || document.querySelector('#chat .mes[is_user="false"]:not(.smallSysMes) .mes_text')
-        || document.querySelector('#chat .mes_text');
-    if (!sample) return;
-    const font = getComputedStyle(sample);
-    for (const prop of ['font-family', 'font-size', 'font-weight', 'line-height',
-        'letter-spacing', 'word-spacing', 'text-shadow']) {
-        const value = font.getPropertyValue(prop);
-        if (value) dialog.style.setProperty(prop, value);
-    }
-}
 
 let currentLoreViewer=null;
 function closeLoreViewer() {
@@ -401,21 +385,26 @@ async function showLoreViewer(entry) {
         const margin = 12;
         dialog.style.maxWidth = Math.max(1, b.width - 2 * margin) + 'px';
         dialog.style.maxHeight = Math.max(1, Math.min(b.height - 2 * margin, 900)) + 'px';
-        const setOffset = () => {
-            dialog.style.transform = 'translate3d(' + offset.x + 'px, ' + offset.y + 'px, 0)';
-        };
-        setOffset();
+        // Keep the reader in the same visual viewport coordinate system as
+        // the chat, without compositing its text through a 3D transform.
+        // This also preserves the previous saved center-relative offsets.
+        dialog.style.position = 'fixed';
         const r = dialog.getBoundingClientRect();
-        // Clamp the complete window, including the title and close button.
-        const left = b.left + margin;
-        const right = b.right - margin;
-        const top = b.top + margin;
-        const bottom = b.bottom - margin;
-        if (r.left < left) offset.x += left - r.left;
-        else if (r.right > right) offset.x += right - r.right;
-        if (r.top < top) offset.y += top - r.top;
-        else if (r.bottom > bottom) offset.y += bottom - r.bottom;
-        setOffset();
+        const centerX = b.left + (b.width - r.width) / 2;
+        const centerY = b.top + (b.height - r.height) / 2;
+        const minX = b.left + margin;
+        const minY = b.top + margin;
+        const maxX = Math.max(minX, b.right - margin - r.width);
+        const maxY = Math.max(minY, b.bottom - margin - r.height);
+        const x = Math.round(Math.max(minX, Math.min(maxX, centerX + offset.x)));
+        const y = Math.round(Math.max(minY, Math.min(maxY, centerY + offset.y)));
+        // Update offsets after clamping so future pointer movement is stable.
+        offset.x = x - centerX;
+        offset.y = y - centerY;
+        dialog.style.left = x + 'px';
+        dialog.style.top = y + 'px';
+        dialog.style.right = 'auto';
+        dialog.style.bottom = 'auto';
     }
     function schedulePlaceViewer() {
         if (viewer.repositionFrame !== null) return;
@@ -473,7 +462,6 @@ async function showLoreViewer(entry) {
     close.addEventListener('click',closeLoreViewer);
     overlay.addEventListener('click',event=>{if(event.target===overlay)closeLoreViewer();});
     document.documentElement.append(overlay);
-    inheritLoreReaderFont(dialog);
     document.addEventListener('keydown',onKeydown);
     window.addEventListener('resize',schedulePlaceViewer,{ passive: true });
     window.addEventListener('orientationchange',schedulePlaceViewer,{ passive: true });
