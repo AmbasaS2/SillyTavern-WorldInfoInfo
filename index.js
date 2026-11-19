@@ -411,21 +411,21 @@ function describeLoreActivation(entry) {
         const secondary = Array.isArray(ev.secondary) ? ev.secondary.filter(x => typeof x === 'string' && x.trim()) : [];
         const hasKeywordEvidence = primary || ['AND_ANY', 'AND_ALL', 'NOT_ANY', 'NOT_ALL'].includes(logic);
         if (hasKeywordEvidence) {
-            let cause = wiT('reader.reason.keyword');
+            let cause = strategy.normal + ' ' + wiT('reader.reason.keyword');
             if (primary) cause += ' · ' + primary;
             if (secondary.length) cause += ' · ' + wiT('reader.reason.secondary') + ' · ' + secondary.join(', ');
             else if (logic === 'NOT_ANY' || logic === 'NOT_ALL') cause += ' · ' + logic.replace('_', ' ');
             causes.push(cause);
         }
-        if (ev.vectorConfirmed === true) causes.push(wiT('reader.reason.vector'));
-        if (logic === 'CONSTANT') causes.push(wiT('reader.reason.constant'));
-        if (logic === 'STICKY') causes.push(wiT('reader.reason.sticky'));
-        if (logic === 'DECORATOR') causes.push(wiT('reader.reason.decorator'));
+        if (ev.vectorConfirmed === true) causes.push(strategy.vectorized + ' ' + wiT('reader.reason.vector'));
+        if (logic === 'CONSTANT') causes.push(strategy.constant + ' ' + wiT('reader.reason.constant'));
+        if (logic === 'STICKY') causes.push('📌 ' + wiT('reader.reason.sticky'));
+        if (logic === 'DECORATOR') causes.push('🪄 ' + wiT('reader.reason.decorator'));
         if ((logic === 'FORCE_ACTIVATE' || logic === 'EXTERNAL') && ev.vectorConfirmed !== true) {
-            causes.push(wiT('reader.reason.external'));
+            causes.push('⚡ ' + wiT('reader.reason.external'));
         }
     }
-    return causes.length ? causes.join(' + ') : wiT('reader.reason.unknown');
+    return causes.length ? causes.join(' + ') : '❔ ' + wiT('reader.reason.unknown');
 }
 
 let currentLoreViewer=null;
