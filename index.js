@@ -1137,9 +1137,14 @@ const init = ()=>{
     let tokenFooter = null;
 
     const showTokenTotal = () => extension_settings.worldInfoInfo?.showTokenTotal === true;
-    // Only a small footer node is added. No list rescan, observer or scroll hook.
+    // Only show the result after a real, nonempty injection has been counted.
+    // No placeholder, empty-chat footer, observer, or additional scanning.
     function syncTokenFooter() {
-        if (!showTokenTotal()) {
+        if (!showTokenTotal() || currentEntryList.length === 0 ||
+            realGenerationInProgress || tokenGenerationAwaitingEnd ||
+            finalizedTokenGeneration !== generationSerial ||
+            tokenSummary?.serial !== generationSerial ||
+            !Number.isFinite(tokenSummary.count)) {
             tokenFooter?.remove();
             tokenFooter = null;
             return;
@@ -1147,31 +1152,18 @@ const init = ()=>{
         if (!tokenFooter || tokenFooter.parentElement !== panel) {
             tokenFooter = document.createElement('div');
             tokenFooter.className = 'stwii--token-total';
-            const label = document.createElement('span');
-            label.textContent = wiT('panel.tokens.label');
             const value = document.createElement('span');
             value.className = 'stwii--token-total-value';
-            tokenFooter.append(label, value);
+            tokenFooter.append(value);
             panel.append(tokenFooter);
         } else if (tokenFooter !== panel.lastElementChild) {
             panel.append(tokenFooter);
         }
-        const value = tokenFooter.lastElementChild;
-        if (realGenerationInProgress || tokenGenerationAwaitingEnd ||
-            finalizedTokenGeneration !== generationSerial) {
-            value.textContent = wiT('panel.tokens.waiting');
-        } else if (tokenSummary?.serial === generationSerial) {
-            value.textContent = tokenSummary.count === null
-                ? wiT('panel.tokens.unavailable')
-                : wiT('panel.tokens.value', tokenSummary.count.toLocaleString());
-        } else if (tokenSummaryPending === generationSerial) {
-            value.textContent = wiT('panel.tokens.calculating');
-        } else {
-            value.textContent = wiT('panel.tokens.ready');
-        }
+        tokenFooter.lastElementChild.textContent = 'Total ' + tokenSummary.count.toLocaleString();
     }
     function scheduleTokenSummary() {
-        if (!showTokenTotal() || !panel.classList.contains('stwii--isActive') ||
+        if (!showTokenTotal() || currentEntryList.length === 0 ||
+            !panel.classList.contains('stwii--isActive') ||
             realGenerationInProgress || tokenGenerationAwaitingEnd ||
             finalizedTokenGeneration !== generationSerial ||
             tokenSummary?.serial === generationSerial || tokenSummaryPending === generationSerial) return;
@@ -1241,6 +1233,7 @@ const init = ()=>{
         tokenSummaryPending = -1;
         tokenSummary = null;
         finalizedTokenGeneration = -1;
+        syncTokenFooter();
         pendingEntries = [];
         stwiiCurrentScanMessageCount = null;
         lastReportBuild = null;
