@@ -1,4 +1,5 @@
 import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
+import { translate as stTranslate } from '../../../i18n.js';
 import { metadata_keys } from '../../../authors-note.js';
 import { extension_settings } from '../../../extensions.js';
 import { promptManager } from '../../../openai.js';
@@ -9,6 +10,60 @@ import { world_info_position, world_names, loadWorldInfo, openWorldInfoEditor } 
 import { getRegexedString, regex_placement } from '../../regex/engine.js';
 import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
+
+
+// Localize only extension-authored UI. Lorebook text and stored translations are untouched.
+const WI_UI_EN = {
+    "trigger.tooltip": "Injected lore entries\nTap: show list · Long press / right click: settings",
+    "settings.group.label": "Group by lorebook",
+    "settings.group.hint": "Group injected entries by their lorebook.",
+    "settings.order.label": "Show in injection order",
+    "settings.order.hint": "Sort by insertion position and order rather than by title.",
+    "settings.messages.label": "Show chat message positions",
+    "settings.messages.hint": "Show the chat messages between injected lore entries when grouping is off and injection order is on.",
+    "settings.drag.label": "Allow dragging the book button",
+    "settings.drag.hint": "Allow the book button to be moved to another location.",
+    "settings.reset.label": "Reset book button position",
+    "settings.reset.hint": "Move the book button back to its default position.",
+    "panel.none": "No injected lore entries",
+    "panel.waiting": "No lore entries to show yet",
+    "panel.hidden": "(hidden entries)",
+    "panel.ungrouped": "Lore entries",
+    "entry.note": "Author’s Note",
+    "entry.sticky": "Sticky for {0} more rounds",
+    "entry.message.one": "Message #{0}",
+    "entry.message.range": "Messages #{0}–{1}",
+    "reader.dialog": "Lore entry",
+    "reader.close": "Close",
+    "reader.body": "Lore text (read-only)",
+    "reader.loading": "Loading lore…",
+    "command.triggered.returns": "last displayed lore entries as JSON",
+    "command.triggered.help": "Return the lore entries shown for the last visible generation. Usage: /wi-triggered",
+    "command.reset.returns": "resets the book button position",
+    "command.reset.help": "Reset the book button to its default position. Usage: /wi-position-reset",
+    "command.reset.done": "Book button position reset.",
+    "command.report.returns": "opens a lore keyword report",
+    "command.report.help": "Show which keywords activated lore entries, including recursion loops. Usage: /wi-report",
+    "command.report.done": "Lore keyword report opened.",
+    "report.title": "Lore keyword report",
+    "report.summary": "Injected lore entries: {0} · Keyword types: {1}",
+    "report.empty": "No activation records available for the last generation.",
+    "report.loopSummary": "Loop {0}: {1} entries",
+    "report.loopTitle": "Loop {0}",
+    "report.frequency": "Keyword frequency",
+    "report.keyword": "Keyword",
+    "report.hits": "Occurrences",
+    "report.entries": "Entries",
+    "report.entryCount": "{0} entries",
+    "report.noKeyword": "(no recorded keyword)",
+    "report.forceActivated": "(force activated)"
+};
+function wiT(key, ...values) {
+    const source = WI_UI_EN[key] ?? key;
+    const translated = stTranslate(source, 'worldInfoInfo.' + key) || source;
+    return String(translated).replace(/\{(\d+)\}/g, (match, index) =>
+        values[Number(index)] === undefined ? match : String(values[Number(index)]));
+}
 
 const STWII = (window.STWII ||= {});
 let navigatingEntry = false;
@@ -81,6 +136,7 @@ function resetWiTriggerPosition(triggerEl = window.STWII?.trigger) {
         triggerEl.style.bottom = '';
     }
     saveSettingsDebounced();
+    requestAnimationFrame(() => STWII.repairPositions?.());
 }
 STWII.resetWiTriggerPosition = resetWiTriggerPosition;
 
@@ -171,7 +227,7 @@ async function showLoreViewer(entry) {
     dialog.className='stwii--reader-dialog';
     dialog.setAttribute('role','dialog');
     dialog.setAttribute('aria-modal','true');
-    dialog.setAttribute('aria-label','Lorebook entry');
+    dialog.setAttribute('aria-label',wiT('reader.dialog'));
     const header=document.createElement('div');
     header.className='stwii--reader-header';
     const title=document.createElement('div');
@@ -180,14 +236,14 @@ async function showLoreViewer(entry) {
     const close=document.createElement('button');
     close.type='button';
     close.className='stwii--reader-close';
-    close.setAttribute('aria-label','닫기');
+    close.setAttribute('aria-label',wiT('reader.close'));
     close.textContent='×';
     const body=document.createElement('textarea');
     body.className='stwii--reader-body';
-    body.setAttribute('aria-label','로어 본문');
+    body.setAttribute('aria-label',wiT('reader.body'));
     body.readOnly=true;
     body.spellcheck=false;
-    body.value='불러오는 중...';
+    body.value=wiT('reader.loading');
     header.append(title,close);
     dialog.append(header,body);
     overlay.append(dialog);
@@ -280,7 +336,7 @@ const init = ()=>{
     const trigger = document.createElement('div'); {
         trigger.classList.add('stwii--trigger');
         trigger.classList.add('fa-solid', 'fa-fw', 'fa-book-atlas');
-        trigger.title = 'Active WI\n---\nright click for options';
+        trigger.title = wiT('trigger.tooltip');
         trigger.addEventListener('click', ()=>{
             // Entries are already rendered when the real generation is processed.
             // Opening the book should be an immediate visibility toggle, not a
@@ -299,14 +355,14 @@ const init = ()=>{
     }
     const panel = document.createElement('div'); {
         panel.classList.add('stwii--panel');
-        panel.innerHTML = '?';
+        panel.textContent = wiT('panel.waiting');
         document.body.append(panel);
     }
     const configPanel = document.createElement('div'); {
         configPanel.classList.add('stwii--panel');
         const rowGroup = document.createElement('label'); {
             rowGroup.classList.add('stwii--configRow');
-            rowGroup.title = 'Group entries by World Info book';
+            rowGroup.title = wiT('settings.group.hint');
             const cb = document.createElement('input'); {
                 cb.type = 'checkbox';
                 cb.checked = extension_settings.worldInfoInfo?.group ?? true;
@@ -321,14 +377,14 @@ const init = ()=>{
                 rowGroup.append(cb);
             }
             const lbl = document.createElement('div'); {
-                lbl.textContent = 'Group by book';
+                lbl.textContent = wiT('settings.group.label');
                 rowGroup.append(lbl);
             }
             configPanel.append(rowGroup);
         }
         const orderRow = document.createElement('label'); {
             orderRow.classList.add('stwii--configRow');
-            orderRow.title = 'Show in insertion depth / order instead of alphabetically';
+            orderRow.title = wiT('settings.order.hint');
             const cb = document.createElement('input'); {
                 cb.type = 'checkbox';
                 cb.checked = extension_settings.worldInfoInfo?.order ?? true;
@@ -343,14 +399,14 @@ const init = ()=>{
                 orderRow.append(cb);
             }
             const lbl = document.createElement('div'); {
-                lbl.textContent = 'Show in order';
+                lbl.textContent = wiT('settings.order.label');
                 orderRow.append(lbl);
             }
             configPanel.append(orderRow);
         }
         const mesRow = document.createElement('label'); {
             mesRow.classList.add('stwii--configRow');
-            mesRow.title = 'Indicate message history (only when ungrouped and shown in order)';
+            mesRow.title = wiT('settings.messages.hint');
             const cb = document.createElement('input'); {
                 cb.type = 'checkbox';
                 cb.checked = extension_settings.worldInfoInfo?.mes ?? true;
@@ -365,7 +421,7 @@ const init = ()=>{
                 mesRow.append(cb);
             }
             const lbl = document.createElement('div'); {
-                lbl.textContent = 'Show messages';
+                lbl.textContent = wiT('settings.messages.label');
                 mesRow.append(lbl);
             }
             configPanel.append(mesRow);
@@ -373,7 +429,7 @@ const init = ()=>{
         // Drag-to-move toggle
         const dragRow = document.createElement('label'); {
             dragRow.classList.add('stwii--configRow');
-            dragRow.title = 'Allow dragging the book icon to reposition it';
+            dragRow.title = wiT('settings.drag.hint');
             const cb = document.createElement('input'); {
                 cb.type = 'checkbox';
                 cb.checked = extension_settings.worldInfoInfo?.drag ?? false;
@@ -392,7 +448,7 @@ const init = ()=>{
                 dragRow.append(cb);
             }
             const lbl = document.createElement('div'); {
-                lbl.textContent = 'Enable drag to move';
+                lbl.textContent = wiT('settings.drag.label');
                 dragRow.append(lbl);
             }
             configPanel.append(dragRow);
@@ -400,10 +456,10 @@ const init = ()=>{
         // Reset position row
         const resetRow = document.createElement('div'); {
             resetRow.classList.add('stwii--configRow');
-            resetRow.title = 'Reset the book icon position to default';
+            resetRow.title = wiT('settings.reset.hint');
             resetRow.style.userSelect = 'none';
             const resetLbl = document.createElement('div'); {
-                resetLbl.textContent = 'Reset position';
+                resetLbl.textContent = wiT('settings.reset.label');
                 resetRow.append(resetLbl);
             }
             resetRow.addEventListener('click', ()=>{
@@ -426,89 +482,92 @@ const init = ()=>{
         }
     }
 
-    // Drag-to-move handlers and helpers
+    // One positioning coordinate system for the compact book button and both
+    // popup panels. Konggomul's visualViewport bounds are used only on open,
+    // on drag, and for viewport changes; there is no polling or DOM observer.
+    function getVisibleBounds() {
+        const vv = window.visualViewport;
+        const left = Number(vv?.offsetLeft) || 0;
+        const top = Number(vv?.offsetTop) || 0;
+        const width = Math.max(1, Number(vv?.width) || window.innerWidth || 1);
+        const height = Math.max(1, Number(vv?.height) || window.innerHeight || 1);
+        return { left, top, width, height, right: left + width, bottom: top + height };
+    }
+
     function clamp(val, min, max) {
-        return Math.max(min, Math.min(max, val));
+        return Math.min(Math.max(Number.isFinite(val) ? val : min, min), Math.max(min, max));
     }
 
-    // Feature-detect CSS Anchor Positioning
-    function supportsAnchors() {
-        return CSS.supports?.('position-anchor: --x') && CSS.supports?.('anchor-name: --x');
+    function setTriggerPosition(left, top) {
+        trigger.style.left = left + 'px';
+        trigger.style.top = top + 'px';
+        trigger.style.right = 'auto';
+        trigger.style.bottom = 'auto';
     }
 
-    // Measure and place a panel near the trigger, clamped to viewport
-    function placePanelNearTrigger(panelEl, triggerEl, gap = 0) {
-        if (!panelEl || !triggerEl) return;
-
-        // Temporarily show to measure when hidden
-        const wasHidden = getComputedStyle(panelEl).display === 'none';
-        if (wasHidden) {
-            panelEl.style.visibility = 'hidden';
-            panelEl.style.display = 'flex';
+    function keepTriggerVisible() {
+        const bounds = getVisibleBounds();
+        const stored = extension_settings.worldInfoInfo?.triggerPos;
+        const hasStored = Number.isFinite(stored?.left) && Number.isFinite(stored?.top);
+        if (!hasStored) {
+            // Always calculate from the CSS default; do not keep a temporary
+            // keyboard-induced displacement after the keyboard closes.
+            trigger.style.left = '';
+            trigger.style.top = '';
+            trigger.style.right = '';
+            trigger.style.bottom = '';
         }
-
-        // Use fixed positioning for robust viewport math
-        panelEl.style.position = 'fixed';
-
-        const tr = triggerEl.getBoundingClientRect();
-        const pw = panelEl.offsetWidth || 300;
-        const ph = panelEl.offsetHeight || 200;
-
-        // Prefer right side, flip to left if overflowing
-        let left = tr.right + gap;
-        if (left + pw > window.innerWidth - 4) {
-            left = tr.left - pw - gap;
+        const rect = trigger.getBoundingClientRect();
+        const baseLeft = hasStored ? stored.left : rect.left;
+        const baseTop = hasStored ? stored.top : rect.top;
+        const margin = 4;
+        const left = clamp(baseLeft, bounds.left + margin, bounds.right - rect.width - margin);
+        const top = clamp(baseTop, bounds.top + margin, bounds.bottom - rect.height - margin);
+        if (hasStored || Math.abs(left - rect.left) > 0.5 || Math.abs(top - rect.top) > 0.5) {
+            setTriggerPosition(left, top);
         }
-        left = clamp(left, 4, Math.max(4, window.innerWidth - pw - 4));
-
-        // Align top with trigger, clamp vertically
-        let top = clamp(tr.top, 4, Math.max(4, window.innerHeight - ph - 4));
-
-        // Apply placement
-        panelEl.style.left = left + 'px';
-        panelEl.style.top = top + 'px';
-        panelEl.style.right = 'auto';
-        panelEl.style.bottom = 'auto';
-
-        if (wasHidden) {
-            panelEl.style.visibility = '';
-            panelEl.style.display = ''; // back to CSS control (.stwii--isActive)
-        }
+        // Viewport changes must not rewrite the user's saved coordinates.
     }
 
-    // Ensure visible placement for panels when toggled/dragged/resized
-    function ensurePanelsVisible() {
-        const isActive = (el) => !!el && el.classList.contains('stwii--isActive');
-        const isOffscreen = (r) => (r.left < 0) || (r.right > window.innerWidth) || (r.top < 0) || (r.bottom > window.innerHeight);
-        const rectDistancePx = (a, b) => {
-            const dx = Math.max(0, Math.max(a.left - b.right, b.left - a.right));
-            const dy = Math.max(0, Math.max(a.top - b.bottom, b.top - a.bottom));
-            return Math.hypot(dx, dy);
-        };
-
-        // Some browsers may pass CSS.supports() but still fail to anchor; treat "far from trigger" as failure.
-        const anchorSupported = supportsAnchors();
+    function placePanelNearTrigger(el) {
+        const bounds = getVisibleBounds();
+        const margin = 6;
+        const maxWidth = Math.max(1, Math.min(bounds.width * 0.8, bounds.width - 2 * margin));
+        const maxHeight = Math.max(1, Math.min(bounds.height * 0.7, bounds.height - 2 * margin));
+        el.style.setProperty('max-width', maxWidth + 'px', 'important');
+        el.style.setProperty('max-height', maxHeight + 'px', 'important');
         const tr = trigger.getBoundingClientRect();
-        const maxAnchorDistancePx = 96;
+        const rect = el.getBoundingClientRect();
+        const pw = rect.width;
+        const ph = rect.height;
 
-        const ensure = (el) => {
-            if (!isActive(el)) return;
-            const r = el.getBoundingClientRect();
-            const farFromTrigger = rectDistancePx(r, tr) > maxAnchorDistancePx;
-            if (isOffscreen(r) || (!anchorSupported) || farFromTrigger) {
-                // If we need JS placement, disable any anchor positioning that might be partially applied.
-                if (anchorSupported) {
-                    el.style.setProperty('position-anchor', 'none');
-                    el.style.setProperty('position-area', 'auto');
-                    el.style.setProperty('position-try-fallbacks', 'none');
-                }
-                placePanelNearTrigger(el, trigger);
-            }
-        };
+        // Prefer the side of the button with room. Keep the entire panel in
+        // the visible mobile viewport (including after keyboard / rotation).
+        const right = tr.right + margin;
+        const left = tr.left - pw - margin;
+        const x = right + pw <= bounds.right - margin ? right
+            : left >= bounds.left + margin ? left
+            : clamp(right, bounds.left + margin, bounds.right - pw - margin);
 
-        ensure(panel);
-        ensure(configPanel);
+        const above = tr.top - ph - margin;
+        const below = tr.bottom + margin;
+        const y = above >= bounds.top + margin ? above
+            : below + ph <= bounds.bottom - margin ? below
+            : clamp(tr.top, bounds.top + margin, bounds.bottom - ph - margin);
+
+        el.style.position = 'fixed';
+        el.style.left = x + 'px';
+        el.style.top = y + 'px';
+        el.style.right = 'auto';
+        el.style.bottom = 'auto';
     }
+
+    function ensurePanelsVisible() {
+        keepTriggerVisible();
+        if (panel.classList.contains('stwii--isActive')) placePanelNearTrigger(panel);
+        if (configPanel.classList.contains('stwii--isActive')) placePanelNearTrigger(configPanel);
+    }
+    STWII.repairPositions = ensurePanelsVisible;
 
     function materializeDefaultPosition() {
         // Convert current visual placement (bottom/left CSS) to top/left pixels
@@ -585,14 +644,10 @@ const init = ()=>{
         const dy = e.clientY - dragStartY;
         if (!movedEnough && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) movedEnough = true;
 
-        const newLeft = clamp(baseLeft + dx, 0, window.innerWidth - trigger.offsetWidth);
-        const newTop = clamp(baseTop + dy, 0, window.innerHeight - trigger.offsetHeight);
-
-        // switch to top/left based positioning
-        trigger.style.left = newLeft + 'px';
-        trigger.style.top = newTop + 'px';
-        trigger.style.right = 'auto';
-        trigger.style.bottom = 'auto';
+        const bounds = getVisibleBounds();
+        const newLeft = clamp(baseLeft + dx, bounds.left + 4, bounds.right - trigger.offsetWidth - 4);
+        const newTop = clamp(baseTop + dy, bounds.top + 4, bounds.bottom - trigger.offsetHeight - 4);
+        setTriggerPosition(newLeft, newTop);
     }
 
     function endDrag(e) {
@@ -632,24 +687,20 @@ const init = ()=>{
         }
     }, true);
 
-    // Ensure the saved position stays visible on resize
-    window.addEventListener('resize', () => {
-        const pos = extension_settings.worldInfoInfo?.triggerPos;
-        if (pos) {
-            const clampedLeft = clamp(pos.left, 0, window.innerWidth - trigger.offsetWidth);
-            const clampedTop = clamp(pos.top, 0, window.innerHeight - trigger.offsetHeight);
-            if (clampedLeft !== pos.left || clampedTop !== pos.top) {
-                pos.left = clampedLeft;
-                pos.top = clampedTop;
-                trigger.style.left = clampedLeft + 'px';
-                trigger.style.top = clampedTop + 'px';
-                saveSettingsDebounced();
-            }
-        }
-
-        // After trigger potentially moved, place visible panels
-        ensurePanelsVisible();
-    });
+    // One coalesced reposition per viewport change, never a full list redraw.
+    let positionRepairFrame = null;
+    function schedulePositionRepair() {
+        if (positionRepairFrame !== null) return;
+        positionRepairFrame = requestAnimationFrame(() => {
+            positionRepairFrame = null;
+            ensurePanelsVisible();
+        });
+    }
+    window.addEventListener('resize', schedulePositionRepair, { passive: true });
+    window.addEventListener('orientationchange', schedulePositionRepair, { passive: true });
+    window.visualViewport?.addEventListener?.('resize', schedulePositionRepair, { passive: true });
+    window.visualViewport?.addEventListener?.('scroll', schedulePositionRepair, { passive: true });
+    schedulePositionRepair();
 
     let entries = [];
 
@@ -727,7 +778,7 @@ const init = ()=>{
         stwiiCurrentLoopEntryIds = null;
         stwiiCurrentLoopEventIds = null;
         stwiiActiveLoopIndex = -1;
-        panel.textContent = 'No active entries';
+        panel.textContent = wiT('panel.none');
         void updateBadge([]);
     });
 
@@ -764,7 +815,7 @@ const init = ()=>{
         currentEntryList = [...included];
         void updateBadge(included.map(it => String(it.world) + '§§§' + String(it.uid)));
         if (included.length) updatePanel(included, true);
-        else panel.textContent = 'No active entries';
+        else panel.textContent = wiT('panel.none');
 
         // Persist one compact report; never persist the intercepted console logs.
         const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
@@ -822,7 +873,7 @@ const init = ()=>{
             grouped = Object.groupBy(entryList, (it,idx)=>it.world);
         } else {
             grouped = {
-                'WI Entries': [...entryList],
+                [wiT('panel.ungrouped')]: [...entryList],
             };
         }
         const depthPos = [world_info_position.ANBottom, world_info_position.ANTop, world_info_position.atDepth];
@@ -844,7 +895,7 @@ const init = ()=>{
                         }
                         const title = document.createElement('div'); {
                             title.classList.add('stwii--title');
-                            title.textContent = '(hidden entries)';
+                            title.textContent = wiT('panel.hidden');
                             placeholder.append(title);
                         }
                         const sticky = document.createElement('div'); {
@@ -999,7 +1050,7 @@ const init = ()=>{
                                     title.append(first);
                                 }
                                 if (entry.last) {
-                                    e.title = `Messages #${entry.from}-${entry.to}\n---\n${entry.first}\n...\n${entry.last}`;
+                                    e.title = wiT('entry.message.range', entry.from, entry.to) + '\n---\n' + entry.first + '\n...\n' + entry.last;
                                     const sep = document.createElement('div'); {
                                         sep.classList.add('stwii--sep');
                                         sep.textContent = '...';
@@ -1011,18 +1062,18 @@ const init = ()=>{
                                         title.append(last);
                                     }
                                 } else {
-                                    e.title = `Message #${entry.from}\n---\n${entry.first}`;
+                                    e.title = wiT('entry.message.one', entry.from) + '\n---\n' + entry.first;
                                 }
                             } else if (entry.type == 'note') {
-                                title.textContent = 'Author\'s Note';
-                                e.title = `Author's Note\n---\n${entry.text}`;
+                                title.textContent = wiT('entry.note');
+                                e.title = wiT('entry.note') + '\n---\n' + entry.text;
                             }
                             e.append(title);
                         }
                         const sticky = document.createElement('div'); {
                             sticky.classList.add('stwii--sticky');
                             sticky.textContent = entry.sticky ? `📌 ${entry.sticky}` : '';
-                            sticky.title = `Sticky for ${entry.sticky} more rounds`;
+                            sticky.title = wiT('entry.sticky', entry.sticky);
                             e.append(sticky);
                         }
                         panel.append(e);
@@ -1038,7 +1089,7 @@ const init = ()=>{
                         }
                         const title = document.createElement('div'); {
                             title.classList.add('stwii--title');
-                            title.textContent = '(hidden entries)';
+                            title.textContent = wiT('panel.hidden');
                             placeholder.append(title);
                         }
                         const sticky = document.createElement('div'); {
@@ -1489,6 +1540,12 @@ window.STWII.destroy = function() {
         if (p && p.parentNode) p.parentNode.removeChild(p);
         const c = window.STWII.configPanel;
         if (c && c.parentNode) c.parentNode.removeChild(c);
+        window.removeEventListener('resize', schedulePositionRepair);
+        window.removeEventListener('orientationchange', schedulePositionRepair);
+        window.visualViewport?.removeEventListener?.('resize', schedulePositionRepair);
+        window.visualViewport?.removeEventListener?.('scroll', schedulePositionRepair);
+        if (positionRepairFrame !== null) cancelAnimationFrame(positionRepairFrame);
+        STWII.repairPositions = null;
     } catch {}
     window.STWII.initialized = false;
 };
@@ -1497,25 +1554,25 @@ window.STWII.destroy = function() {
         callback: (args, value)=>{
             return JSON.stringify(currentEntryList);
         },
-        returns: 'list of triggered WI entries',
-        helpString: 'Get the list of World Info entries triggered on the last generation.',
+        returns: wiT('command.triggered.returns'),
+        helpString: wiT('command.triggered.help'),
     }));
 
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'wi-position-reset',
         callback: () => {
             resetWiTriggerPosition();
-            return 'Reset WI icon position.';
+            return wiT('command.reset.done');
         },
-        returns: 'resets WI icon position',
-        helpString: 'Reset the World Info Info book icon position (same as clicking "Reset position"). Usage: /wi-position-reset',
+        returns: wiT('command.reset.returns'),
+        helpString: wiT('command.reset.help'),
     }));
 
     // Generate a keyword frequency report from captured activation events (popup with declared options)
     SlashCommandParser.addCommandObject(SlashCommand.fromProps({
         name: 'wi-report',
-        returns: 'opens popup',
-        helpString: 'Show keywords that triggered WI entries (most frequent first) in a scrollable popup. Usage: /wi-report',
+        returns: wiT('command.report.returns'),
+        helpString: wiT('command.report.help'),
         callback: async () => {
             // Prefer the confirmed compact report; legacy logs remain readable.
             const compact = chat_metadata.stwiiLastReport;
@@ -1752,15 +1809,15 @@ window.STWII.destroy = function() {
 
             const title = document.createElement('div');
             title.classList.add('stwii-report-title');
-            title.textContent = 'World Info Keyword Report';
+            title.textContent = wiT('report.title');
             container.append(title);
 
             const summary = document.createElement('div');
             summary.classList.add('stwii-report-summary');
             const addedCount = events.length;
             summary.textContent = events.length
-                ? `Entries added to WI: ${addedCount} • Unique keywords: ${sorted.length}`
-                : 'No activation events captured yet.';
+                ? wiT('report.summary', addedCount, sorted.length)
+                : wiT('report.empty');
             container.append(summary);
 
             // Loop breakdown (from latest non-dry run)
@@ -1788,7 +1845,7 @@ window.STWII.destroy = function() {
                         shown = events.slice(start, end).length;
                     }
 
-                    return `Loop ${i + 1}: ${shown} entries`;
+                    return wiT('report.loopSummary', i + 1, shown);
                 });
 
                 loopDiv.textContent = pieces.join(' • ');
@@ -1798,7 +1855,7 @@ window.STWII.destroy = function() {
             if (events.length && sorted.length) {
                 const freqHeader = document.createElement('div');
                 freqHeader.classList.add('stwii-report-subtitle');
-                freqHeader.textContent = 'Keyword Frequency';
+                freqHeader.textContent = wiT('report.frequency');
                 container.append(freqHeader);
 
                 const table = document.createElement('table');
@@ -1806,10 +1863,10 @@ window.STWII.destroy = function() {
 
                 const thead = document.createElement('thead');
                 const headRow = document.createElement('tr');
-                for (const label of ['Keyword', 'Hits', 'Entries']) {
+                for (const labelKey of ['report.keyword', 'report.hits', 'report.entries']) {
                     const th = document.createElement('th');
-                    if (label === 'Hits') th.classList.add('stwii-report-table-count');
-                    th.textContent = label;
+                    if (labelKey === 'report.hits') th.classList.add('stwii-report-table-count');
+                    th.textContent = wiT(labelKey);
                     headRow.append(th);
                 }
                 thead.append(headRow);
@@ -1820,7 +1877,8 @@ window.STWII.destroy = function() {
                     const row = document.createElement('tr');
 
                     const keywordCell = document.createElement('td');
-                    keywordCell.textContent = kw;
+                    keywordCell.textContent = kw === '(no keyword)' ? wiT('report.noKeyword')
+                        : kw === FORCE_ACTIVATED_KEYWORD ? wiT('report.forceActivated') : kw;
                     row.append(keywordCell);
 
                     const hitsCell = document.createElement('td');
@@ -1834,7 +1892,7 @@ window.STWII.destroy = function() {
                     details.classList.add('stwii-report-drawer');
 
                     const detailsSummary = document.createElement('summary');
-                    detailsSummary.textContent = `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`;
+                    detailsSummary.textContent = wiT('report.entryCount', entries.length);
                     details.append(detailsSummary);
 
                     const entryList = document.createElement('ul');
@@ -1869,7 +1927,7 @@ window.STWII.destroy = function() {
 
                     const header = document.createElement('div');
                     header.classList.add('stwii-report-subtitle');
-                    header.textContent = `Loop ${i + 1}`;
+                    header.textContent = wiT('report.loopTitle', i + 1);
                     container.append(header);
 
                     let list = [];
@@ -1918,7 +1976,7 @@ window.STWII.destroy = function() {
 
                         let kwText = '';
                         if (isForceActivatedEvent(ev, primaryKw, secRaw)) {
-                            kwText = ` ${FORCE_ACTIVATED_KEYWORD}`;
+                            kwText = ' ' + wiT('report.forceActivated');
                         } else if (prim && uniqSecFiltered.length) {
                             // Have primary and secondaries; include op if present, otherwise comma-separate
                             if (op) {
@@ -1938,7 +1996,7 @@ window.STWII.destroy = function() {
                             }
                         } else {
                             // No captured primary or secondary keywords
-                            kwText = ' (no keyword)';
+                            kwText = ' ' + wiT('report.noKeyword');
                         }
 
                             if (kwText) {
@@ -1966,14 +2024,14 @@ window.STWII.destroy = function() {
             // Use Popup API with allowVerticalScrolling
             const popup = new Popup(container, POPUP_TYPE.TEXT, '', {
                 allowVerticalScrolling: true,
-                okButton: 'Close',
+                okButton: wiT('reader.close'),
                 wide: true,
                 large: true,
                 leftAlign: true,
                 animation: 'fast',
             });
             await popup.show();
-            return 'Opened WI Report popup.';
+            return wiT('command.report.done');
         },
     }));
 };

@@ -1,7 +1,7 @@
 .stwii--trigger {
   user-select: none;
   -webkit-touch-callout: none;
-  position: absolute;
+  position: fixed;
   bottom: 0.125em;
   left: 0.25em;
   font-size: 2em;
@@ -54,6 +54,7 @@
   padding: 0.5em;
   display: none;
   flex-direction: column;
+  width: max-content;
   right: 3.5em;
   top: 1em;
   font-size: small;
@@ -192,23 +193,7 @@
   }
 }
 
-/* Gate anchor positioning behind feature detection */
-@supports (position-anchor: --x) {
-  .stwii--trigger {
-    anchor-name: --stac--wiAnchor;
-  }
-  .stwii--panel {
-    position-anchor: --stac--wiAnchor;
-    position-area: top right;
-    position-try-fallbacks: flip-block, flip-inline;
-    /* Let anchored positioning control the box inset; base `top/right` are fallback-only */
-    top: auto;
-    right: auto;
-    bottom: auto;
-    left: auto;
-  }
-}
-
+/* Popups use one fixed visual-viewport positioning path (no CSS anchor). */
 /* WI Report popup content (declared styles, no inline) */
 .stwii-report-container {
   display: flex;
