@@ -314,6 +314,45 @@ function renderLorePreview(target, source) {
     }
 }
 
+
+// Match the *computed* typography of a real character message. Copying font
+// styles to the dialog parent did not override .mes_text on the preview itself,
+// and selectors scoped to #chat do not match a modal mounted under <html>.
+// Do this only when opening the viewer; no polling or global observers.
+function matchLoreReaderChatTypography(dialog, body) {
+    const source = document.querySelector('#chat .mes.last_mes[is_user="false"]:not(.smallSysMes) .mes_text:not(:empty)')
+        || document.querySelector('#chat .mes[is_user="false"]:not(.smallSysMes) .mes_text:not(:empty)')
+        || document.querySelector('#chat .mes:not(.smallSysMes) .mes_text:not(:empty)');
+    if (!source) return;
+    // Gather comparisons before writing styles, avoiding interleaved
+    // style recalculation/layout. Runs once per reader open, never in scans.
+    const sourceStyle = getComputedStyle(source);
+    const currentBodyStyle = getComputedStyle(body);
+    const currentDialogStyle = getComputedStyle(dialog);
+    const typography = [
+        'font-family', 'font-size', 'font-weight', 'font-style',
+        'font-stretch', 'font-variation-settings',
+        'font-feature-settings', 'font-kerning', 'font-optical-sizing',
+        'font-synthesis', 'line-height', 'letter-spacing', 'word-spacing',
+        'text-shadow', 'text-rendering', '-webkit-font-smoothing',
+    ];
+    const bodyChanges = typography.map(property => ({
+        property,
+        value: sourceStyle.getPropertyValue(property),
+        existing: currentBodyStyle.getPropertyValue(property),
+    })).filter(({ value, existing }) => value && value.trim() !== existing.trim());
+    // Title uses normal font weight by design; copy only shared font metrics.
+    const titleChanges = ['font-family', 'font-size', 'line-height',
+        'letter-spacing', 'word-spacing', 'text-shadow'].map(property => ({
+        property,
+        value: sourceStyle.getPropertyValue(property),
+        existing: currentDialogStyle.getPropertyValue(property),
+    })).filter(({ value, existing }) => value && value.trim() !== existing.trim());
+
+    for (const { property, value } of bodyChanges) body.style.setProperty(property, value, 'important');
+    for (const { property, value } of titleChanges) dialog.style.setProperty(property, value);
+}
+
 let currentLoreViewer=null;
 function closeLoreViewer() {
     const viewer=currentLoreViewer;
@@ -462,6 +501,7 @@ async function showLoreViewer(entry) {
     close.addEventListener('click',closeLoreViewer);
     overlay.addEventListener('click',event=>{if(event.target===overlay)closeLoreViewer();});
     document.documentElement.append(overlay);
+    matchLoreReaderChatTypography(dialog, body);
     document.addEventListener('keydown',onKeydown);
     window.addEventListener('resize',schedulePlaceViewer,{ passive: true });
     window.addEventListener('orientationchange',schedulePlaceViewer,{ passive: true });
