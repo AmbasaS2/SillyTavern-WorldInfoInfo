@@ -8,6 +8,7 @@ import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.j
 import { delay, flashHighlight } from '../../../utils.js';
 import { world_info_position, world_names, loadWorldInfo, openWorldInfoEditor } from '../../../world-info.js';
 import { getRegexedString, regex_placement } from '../../regex/engine.js';
+import { getTokenCountAsync } from '../../../tokenizers.js';
 import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { showdown, DOMPurify } from '../../../../lib.js';
@@ -22,6 +23,14 @@ const WI_UI_EN = {
     "settings.order.hint": "Sort by insertion position and order rather than by title.",
     "settings.messages.label": "Show chat message positions",
     "settings.messages.hint": "Show the chat messages between injected lore entries when grouping is off and injection order is on.",
+    "settings.tokens.label": "Show injected lore token total",
+    "settings.tokens.hint": "Optional estimate when you open the list. No token counting during generation.",
+    "panel.tokens.label": "Injected lore total",
+    "panel.tokens.value": "~{0} tokens",
+    "panel.tokens.calculating": "Counting…",
+    "panel.tokens.waiting": "Available after generation",
+    "panel.tokens.ready": "Open list to calculate",
+    "panel.tokens.unavailable": "Token count unavailable",
     "settings.drag.label": "Allow dragging the book button",
     "settings.drag.hint": "Allow the book button to be moved to another location.",
     "settings.reset.label": "Reset book button position",
@@ -679,12 +688,17 @@ const init = ()=>{
         trigger.classList.add('stwii--trigger');
         trigger.classList.add('fa-solid', 'fa-fw', 'fa-book-atlas');
         trigger.title = wiT('trigger.tooltip');
+        trigger.draggable = false;
+        // Disable native mobile browser dragging without touching the optional
+        // extension-controlled drag mode or introducing an observer.
+        trigger.addEventListener('dragstart', event => event.preventDefault());
         trigger.addEventListener('click', ()=>{
             // Entries are already rendered when the real generation is processed.
             // Opening the book should be an immediate visibility toggle, not a
             // second pass through chat history and every World Info entry.
-            panel.classList.toggle('stwii--isActive');
+            const opened = panel.classList.toggle('stwii--isActive');
             requestAnimationFrame(ensurePanelsVisible);
+            if (opened) scheduleTokenSummary();
         });
         trigger.addEventListener('contextmenu', (evt)=>{
             evt.preventDefault();
@@ -767,6 +781,27 @@ const init = ()=>{
                 mesRow.append(lbl);
             }
             configPanel.append(mesRow);
+        }
+        // Opt-in token total. OFF by default, no tokenizer work at boot or
+        // during generation; only an opened list can start a single count.
+        const tokenRow = document.createElement('label'); {
+            tokenRow.classList.add('stwii--configRow');
+            tokenRow.title = wiT('settings.tokens.hint');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = extension_settings.worldInfoInfo?.showTokenTotal ?? false;
+            cb.addEventListener('change', () => {
+                if (!extension_settings.worldInfoInfo) extension_settings.worldInfoInfo = {};
+                extension_settings.worldInfoInfo.showTokenTotal = cb.checked;
+                syncTokenFooter();
+                if (cb.checked) scheduleTokenSummary();
+                saveSettingsDebounced();
+                requestAnimationFrame(ensurePanelsVisible);
+            });
+            const lbl = document.createElement('div');
+            lbl.textContent = wiT('settings.tokens.label');
+            tokenRow.append(cb, lbl);
+            configPanel.append(tokenRow);
         }
         // Drag-to-move toggle
         const dragRow = document.createElement('label'); {
@@ -924,6 +959,7 @@ const init = ()=>{
     }
 
     let dragging = false;
+    const touchDragThreshold = 12;
     let dragStartX = 0, dragStartY = 0;
     let baseLeft = 0, baseTop = 0;
     let movedEnough = false;
@@ -949,6 +985,12 @@ const init = ()=>{
             longPressTimer = null;
             lastLongPressMenuAt = Date.now();
             suppressNextClick = true;
+            // A stationary long press owns this gesture, even if the optional
+            // button-drag setting is enabled. Finger jitter must not move it.
+            dragging = false;
+            movedEnough = false;
+            trigger.style.touchAction = '';
+            try { trigger.releasePointerCapture?.(longPressPointerId); } catch {}
             // A long press opens settings rather than also toggling the entry list.
             configPanel.classList.add('stwii--isActive');
             requestAnimationFrame(ensurePanelsVisible);
@@ -957,8 +999,8 @@ const init = ()=>{
     }
     function onLongPressPointerMove(e) {
         if (e.pointerId !== longPressPointerId) return;
-        if (Math.abs(e.clientX - longPressStartX) > 10 ||
-            Math.abs(e.clientY - longPressStartY) > 10) clearLongPress();
+        if (Math.abs(e.clientX - longPressStartX) > touchDragThreshold ||
+            Math.abs(e.clientY - longPressStartY) > touchDragThreshold) clearLongPress();
     }
 
     function onPointerDown(e) {
@@ -983,7 +1025,9 @@ const init = ()=>{
         if (!dragging) return;
         const dx = e.clientX - dragStartX;
         const dy = e.clientY - dragStartY;
-        if (!movedEnough && (Math.abs(dx) > 4 || Math.abs(dy) > 4)) movedEnough = true;
+        const threshold = e.pointerType === 'touch' ? touchDragThreshold : 4;
+        if (!movedEnough && (Math.abs(dx) > threshold || Math.abs(dy) > threshold)) movedEnough = true;
+        if (!movedEnough) return;
 
         const bounds = getVisibleBounds();
         const newLeft = clamp(baseLeft + dx, bounds.left + 4, bounds.right - trigger.offsetWidth - 4);
@@ -1085,6 +1129,89 @@ const init = ()=>{
     let realGenerationInProgress = false;
     let lastReportBuild = null;
     let lastRenderedGenerationEntries = null;
+    let finalizedTokenGeneration = -1;
+    let tokenGenerationAwaitingEnd = false;
+    let tokenSummary = null;          // { serial, count }, count null means unavailable
+    let tokenSummaryPending = -1;
+    let tokenSummaryRequest = 0;
+    let tokenFooter = null;
+
+    const showTokenTotal = () => extension_settings.worldInfoInfo?.showTokenTotal === true;
+    // Only a small footer node is added. No list rescan, observer or scroll hook.
+    function syncTokenFooter() {
+        if (!showTokenTotal()) {
+            tokenFooter?.remove();
+            tokenFooter = null;
+            return;
+        }
+        if (!tokenFooter || tokenFooter.parentElement !== panel) {
+            tokenFooter = document.createElement('div');
+            tokenFooter.className = 'stwii--token-total';
+            const label = document.createElement('span');
+            label.textContent = wiT('panel.tokens.label');
+            const value = document.createElement('span');
+            value.className = 'stwii--token-total-value';
+            tokenFooter.append(label, value);
+            panel.append(tokenFooter);
+        } else if (tokenFooter !== panel.lastElementChild) {
+            panel.append(tokenFooter);
+        }
+        const value = tokenFooter.lastElementChild;
+        if (realGenerationInProgress || tokenGenerationAwaitingEnd ||
+            finalizedTokenGeneration !== generationSerial) {
+            value.textContent = wiT('panel.tokens.waiting');
+        } else if (tokenSummary?.serial === generationSerial) {
+            value.textContent = tokenSummary.count === null
+                ? wiT('panel.tokens.unavailable')
+                : wiT('panel.tokens.value', tokenSummary.count.toLocaleString());
+        } else if (tokenSummaryPending === generationSerial) {
+            value.textContent = wiT('panel.tokens.calculating');
+        } else {
+            value.textContent = wiT('panel.tokens.ready');
+        }
+    }
+    function scheduleTokenSummary() {
+        if (!showTokenTotal() || !panel.classList.contains('stwii--isActive') ||
+            realGenerationInProgress || tokenGenerationAwaitingEnd ||
+            finalizedTokenGeneration !== generationSerial ||
+            tokenSummary?.serial === generationSerial || tokenSummaryPending === generationSerial) return;
+
+        const serial = generationSerial;
+        const chatId = getCurrentChatId();
+        const request = ++tokenSummaryRequest;
+        tokenSummaryPending = serial;
+        syncTokenFooter();
+        // Defer beyond the first paint: opening the book stays instantaneous.
+        // Compute exactly one combined count, not one request per entry.
+        requestAnimationFrame(() => setTimeout(async () => {
+            if (request !== tokenSummaryRequest || serial !== generationSerial ||
+                chatId !== getCurrentChatId() || !showTokenTotal() ||
+                !panel.classList.contains('stwii--isActive') ||
+                realGenerationInProgress || tokenGenerationAwaitingEnd ||
+                finalizedTokenGeneration !== serial) {
+                if (request === tokenSummaryRequest) {
+                    tokenSummaryPending = -1;
+                    syncTokenFooter();
+                }
+                return;
+            }
+            let count = null;
+            try {
+                const texts = currentEntryList.filter(entry => entry?.type === 'wi')
+                    .map(renderedWiContent).filter(Boolean);
+                const result = texts.length ? await getTokenCountAsync(texts.join('\n')) : 0;
+                if (Number.isFinite(result) && result >= 0) count = Math.round(result);
+            } catch {
+                // Counting is optional. A tokenizer error must never affect lore.
+            }
+            if (request !== tokenSummaryRequest || serial !== generationSerial ||
+                chatId !== getCurrentChatId()) return;
+            tokenSummaryPending = -1;
+            tokenSummary = { serial, count };
+            syncTokenFooter();
+            if (panel.classList.contains('stwii--isActive')) requestAnimationFrame(ensurePanelsVisible);
+        }, 0));
+    }
     // This is the exact number of messages used by the last real WI scan.
     // SillyTavern already logs it; no chat/history scan is needed.
     let stwiiCurrentScanMessageCount = null;
@@ -1098,7 +1225,8 @@ const init = ()=>{
         lastRenderedGenerationEntries = signature;
         void updateBadge(list.map(entry => String(entry.world) + '§§§' + String(entry.uid)));
         if (list.length) updatePanel(list, true);
-        else panel.textContent = '?';
+        else { panel.textContent = '?'; tokenFooter = null; }
+        syncTokenFooter();
     }
 
     const beginRealGeneration = (type, options, dryRun) => {
@@ -1108,6 +1236,11 @@ const init = ()=>{
         if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
         generationSerial++;
         realGenerationInProgress = true;
+        tokenGenerationAwaitingEnd = true;
+        tokenSummaryRequest++;
+        tokenSummaryPending = -1;
+        tokenSummary = null;
+        finalizedTokenGeneration = -1;
         pendingEntries = [];
         stwiiCurrentScanMessageCount = null;
         lastReportBuild = null;
@@ -1127,6 +1260,11 @@ const init = ()=>{
     eventSource.on(event_types.CHAT_CHANGED, () => {
         generationSerial++;
         realGenerationInProgress = false;
+        tokenGenerationAwaitingEnd = false;
+        tokenSummaryRequest++;
+        tokenSummaryPending = -1;
+        tokenSummary = null;
+        finalizedTokenGeneration = -1;
         pendingEntries = [];
         stwiiCurrentScanMessageCount = null;
         currentEntryList = [];
@@ -1141,6 +1279,8 @@ const init = ()=>{
         stwiiCurrentLoopEventIds = null;
         stwiiActiveLoopIndex = -1;
         panel.textContent = '?';
+        tokenFooter = null;
+        syncTokenFooter();
         void updateBadge([]);
     });
 
@@ -1178,6 +1318,10 @@ const init = ()=>{
         // Repaint only if an outlet is confirmed or sticky metadata changed;
         // otherwise keep the already-built DOM and instant button response.
         renderGenerationEntries(included);
+        finalizedTokenGeneration = generationSerial;
+        // GENERATE_AFTER_DATA runs BEFORE the model replies. Do not tokenize
+        // while the request is being sent or while its response is streaming.
+        syncTokenFooter();
 
         // Persist one compact report; never persist the intercepted console logs.
         const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
@@ -1191,6 +1335,17 @@ const init = ()=>{
                 ? chat_metadata.stwiiLastLoopEntryIds.map(ids => Array.isArray(ids) ? [...ids] : null) : [],
         };
     });
+
+    // Wait for the actual reply to finish (not prompt construction). This
+    // single event callback only schedules work when the opt-in list is open.
+    const onCompletedGeneration = () => {
+        if (!tokenGenerationAwaitingEnd) return;
+        tokenGenerationAwaitingEnd = false;
+        syncTokenFooter();
+        if (panel.classList.contains('stwii--isActive')) scheduleTokenSummary();
+    };
+    eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);
+    eventSource.on(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
 
     const updatePanel = (entryList, newChat = false)=>{
         const isGrouped = extension_settings.worldInfoInfo?.group ?? true;
@@ -1465,6 +1620,7 @@ const init = ()=>{
                 }
             }
         }
+        syncTokenFooter();
     };
 
     // Raw console lines are transient; only a compact keyword report is saved.
@@ -1949,6 +2105,13 @@ function endBuildSession() {
 
 // Optional teardown to remove UI and unpatch console
 window.STWII.destroy = function() {
+    tokenSummaryRequest++;
+    tokenSummaryPending = -1;
+    // New completion hooks have explicit teardown; no lingering token work.
+    try {
+        eventSource.removeListener?.(event_types.GENERATION_ENDED, onCompletedGeneration);
+        eventSource.removeListener?.(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
+    } catch {}
     closeLoreViewer();
     try { window.STWII.unpatchConsole?.(); } catch {}
     try {

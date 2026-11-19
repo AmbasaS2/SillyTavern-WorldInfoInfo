@@ -1,4 +1,5 @@
 .stwii--trigger {
+  -webkit-user-drag: none;
   user-select: none;
   -webkit-touch-callout: none;
   position: fixed;
@@ -68,6 +69,23 @@
 }
 .stwii--panel.stwii--isActive {
   display: flex;
+}
+.stwii--token-total {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: .3em .75em;
+  min-width: 0;
+  margin: .45em .15em 0;
+  padding: .55em .15em .15em;
+  border-top: 1px solid color-mix(in srgb, var(--SmartThemeBodyColor, currentColor) 25%, transparent);
+  font-size: .95em;
+  opacity: .85;
+}
+.stwii--token-total-value {
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
 }
 .stwii--world {
   font-weight: bold;
