@@ -321,7 +321,6 @@ function inheritLoreReaderFont(dialog) {
     const font = getComputedStyle(sample);
     dialog.style.fontFamily = font.fontFamily;
     dialog.style.fontSize = font.fontSize;
-    dialog.style.fontWeight = font.fontWeight;
     dialog.style.lineHeight = font.lineHeight;
     dialog.style.letterSpacing = font.letterSpacing;
 }

@@ -282,6 +282,7 @@
 .stwii--reader-dialog {
   font-family: inherit;
   font-size: inherit;
+  font-weight: 400;
   display: flex; flex-direction: column; gap: 12px;
   box-sizing: border-box; width: min(660px, 100%); max-height: min(82dvh, 900px);
   min-width: 0; padding: 16px;
@@ -310,7 +311,7 @@
   font-family: inherit; font-size: inherit; font-weight: inherit; line-height: 1.6;
   cursor: default; caret-color: transparent;
   border: 1px solid var(--SmartThemeBorderColor, currentColor);
-  border-radius: 8px; background: var(--SmartThemeBlurTintColor, transparent); color: inherit;
+  border-radius: 8px; background-color: var(--SmartThemeChatTintColor, var(--SmartThemeBlurTintColor, transparent)); color: inherit;
 }
 /* Markdown content is displayed as formatted, selectable text, not an input. */
 .stwii--reader-body p { margin: 0 0 .85em; }
