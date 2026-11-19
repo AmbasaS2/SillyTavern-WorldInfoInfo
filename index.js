@@ -314,15 +314,20 @@ function renderLorePreview(target, source) {
     }
 }
 function inheritLoreReaderFont(dialog) {
-    // This dialog is attached to <html> to avoid CSS transforms applied to
-    // <body>. Sample the actual chat text so custom themes still apply.
-    const sample = document.querySelector('#chat .mes_text, .mes_text') || document.body;
+    // This viewer lives outside <body> to escape theme transforms, so its
+    // inherited typography is otherwise different from the chat. Match an
+    // actual character message, not an arbitrary/system message or a fixed
+    // font size. No polling: this runs only when a lore reader opens.
+    const sample = document.querySelector('#chat .mes.last_mes[is_user="false"]:not(.smallSysMes) .mes_text')
+        || document.querySelector('#chat .mes[is_user="false"]:not(.smallSysMes) .mes_text')
+        || document.querySelector('#chat .mes_text');
     if (!sample) return;
     const font = getComputedStyle(sample);
-    dialog.style.fontFamily = font.fontFamily;
-    dialog.style.fontSize = font.fontSize;
-    dialog.style.lineHeight = font.lineHeight;
-    dialog.style.letterSpacing = font.letterSpacing;
+    for (const prop of ['font-family', 'font-size', 'font-weight', 'line-height',
+        'letter-spacing', 'word-spacing', 'text-shadow']) {
+        const value = font.getPropertyValue(prop);
+        if (value) dialog.style.setProperty(prop, value);
+    }
 }
 
 let currentLoreViewer=null;
@@ -359,7 +364,8 @@ async function showLoreViewer(entry) {
     close.setAttribute('aria-label',wiT('reader.close'));
     close.textContent='×';
     const body=document.createElement('div');
-    body.className='stwii--reader-body';
+    // Reuse the same Markdown typography and theme rules as chat messages.
+    body.className='stwii--reader-body mes_text';
     body.setAttribute('role','document');
     body.setAttribute('aria-label',wiT('reader.body'));
     body.tabIndex=0;
