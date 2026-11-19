@@ -364,12 +364,13 @@ function closeLoreViewer() {
     window.visualViewport?.removeEventListener?.('resize',viewer.reposition);
     window.visualViewport?.removeEventListener?.('scroll',viewer.reposition);
     if (viewer.repositionFrame !== null) cancelAnimationFrame(viewer.repositionFrame);
+    viewer.overlay.close();
     viewer.overlay.remove();
     viewer.previousFocus?.focus?.();
 }
 async function showLoreViewer(entry) {
     closeLoreViewer();
-    const overlay=document.createElement('div');
+    const overlay=document.createElement('dialog');
     overlay.className='stwii--reader-overlay';
     const dialog=document.createElement('section');
     dialog.className='stwii--reader-dialog';
@@ -398,8 +399,8 @@ async function showLoreViewer(entry) {
     overlay.append(dialog);
     const previousFocus=document.activeElement;
 
-    // The viewer is mounted above body: themes that transform/scroll body can
-    // no longer displace this fixed modal off the desktop viewport.
+    // Keep the body's theme scope (fonts, noShadows, etc.). The native modal
+    // top layer keeps fixed positioning independent of transformed ancestors.
     const settingsKey = window.innerWidth <= 600 ? 'readerPosMobile' : 'readerPosDesktop';
     const stored = extension_settings.worldInfoInfo?.[settingsKey];
     const offset = {
@@ -500,7 +501,9 @@ async function showLoreViewer(entry) {
     currentLoreViewer = viewer;
     close.addEventListener('click',closeLoreViewer);
     overlay.addEventListener('click',event=>{if(event.target===overlay)closeLoreViewer();});
-    document.documentElement.append(overlay);
+    overlay.addEventListener('cancel',event=>{event.preventDefault();closeLoreViewer();});
+    document.body.append(overlay);
+    overlay.showModal();
     matchLoreReaderChatTypography(dialog, body);
     document.addEventListener('keydown',onKeydown);
     window.addEventListener('resize',schedulePlaceViewer,{ passive: true });
