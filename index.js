@@ -293,6 +293,11 @@ function closeLoreViewer() {
     if (!viewer) return;
     currentLoreViewer=null;
     document.removeEventListener('keydown',viewer.onKeydown);
+    window.removeEventListener('resize',viewer.reposition);
+    window.removeEventListener('orientationchange',viewer.reposition);
+    window.visualViewport?.removeEventListener?.('resize',viewer.reposition);
+    window.visualViewport?.removeEventListener?.('scroll',viewer.reposition);
+    if (viewer.repositionFrame !== null) cancelAnimationFrame(viewer.repositionFrame);
     viewer.overlay.remove();
     viewer.previousFocus?.focus?.();
 }
@@ -325,17 +330,111 @@ async function showLoreViewer(entry) {
     dialog.append(header,body);
     overlay.append(dialog);
     const previousFocus=document.activeElement;
+
+    // The viewer is mounted above body: themes that transform/scroll body can
+    // no longer displace this fixed modal off the desktop viewport.
+    const settingsKey = window.innerWidth <= 600 ? 'readerPosMobile' : 'readerPosDesktop';
+    const stored = extension_settings.worldInfoInfo?.[settingsKey];
+    const offset = {
+        x: Number.isFinite(stored?.x) ? stored.x : 0,
+        y: Number.isFinite(stored?.y) ? stored.y : 0,
+    };
+    const viewer = {
+        overlay, previousFocus, onKeydown: null, reposition: null,
+        repositionFrame: null,
+    };
+    function getViewerBounds() {
+        const vv = window.visualViewport;
+        const left = Number(vv?.offsetLeft) || 0;
+        const top = Number(vv?.offsetTop) || 0;
+        const width = Math.max(1, Number(vv?.width) || window.innerWidth || 1);
+        const height = Math.max(1, Number(vv?.height) || window.innerHeight || 1);
+        return { left, top, right: left + width, bottom: top + height, width, height };
+    }
+    function placeViewer() {
+        if (currentLoreViewer !== viewer) return;
+        const b = getViewerBounds();
+        const margin = 12;
+        dialog.style.maxWidth = Math.max(1, b.width - 2 * margin) + 'px';
+        dialog.style.maxHeight = Math.max(1, Math.min(b.height - 2 * margin, 900)) + 'px';
+        const setOffset = () => {
+            dialog.style.transform = 'translate3d(' + offset.x + 'px, ' + offset.y + 'px, 0)';
+        };
+        setOffset();
+        const r = dialog.getBoundingClientRect();
+        // Clamp the complete window, including the title and close button.
+        const left = b.left + margin;
+        const right = b.right - margin;
+        const top = b.top + margin;
+        const bottom = b.bottom - margin;
+        if (r.left < left) offset.x += left - r.left;
+        else if (r.right > right) offset.x += right - r.right;
+        if (r.top < top) offset.y += top - r.top;
+        else if (r.bottom > bottom) offset.y += bottom - r.bottom;
+        setOffset();
+    }
+    function schedulePlaceViewer() {
+        if (viewer.repositionFrame !== null) return;
+        viewer.repositionFrame = requestAnimationFrame(() => {
+            viewer.repositionFrame = null;
+            placeViewer();
+        });
+    }
+    viewer.reposition = schedulePlaceViewer;
+
+    // Only the modal header can drag it. No global observer or per-frame polling.
+    let pointer = null;
+    header.addEventListener('pointerdown', e => {
+        if (e.button !== 0 || e.target.closest('button')) return;
+        e.preventDefault();
+        pointer = { id: e.pointerId, x: e.clientX, y: e.clientY,
+            startX: offset.x, startY: offset.y, moved: false };
+        try { header.setPointerCapture(e.pointerId); } catch {}
+        dialog.classList.add('stwii--reader-dragging');
+    });
+    header.addEventListener('pointermove', e => {
+        if (!pointer || pointer.id !== e.pointerId) return;
+        const dx = e.clientX - pointer.x;
+        const dy = e.clientY - pointer.y;
+        if (Math.abs(dx) + Math.abs(dy) >= 3) pointer.moved = true;
+        offset.x = pointer.startX + dx;
+        offset.y = pointer.startY + dy;
+        placeViewer();
+    });
+    function finishViewerDrag(e, save) {
+        if (!pointer || pointer.id !== e.pointerId) return;
+        const didMove = pointer.moved;
+        pointer = null;
+        dialog.classList.remove('stwii--reader-dragging');
+        try { header.releasePointerCapture(e.pointerId); } catch {}
+        if (save && didMove) {
+            if (!extension_settings.worldInfoInfo) extension_settings.worldInfoInfo = {};
+            extension_settings.worldInfoInfo[settingsKey] = {
+                x: Math.round(offset.x), y: Math.round(offset.y),
+            };
+            saveSettingsDebounced();
+        }
+    }
+    header.addEventListener('pointerup', e => finishViewerDrag(e, true));
+    header.addEventListener('pointercancel', e => finishViewerDrag(e, false));
+
     const onKeydown=(event)=>{
         if (event.key==='Escape') {event.preventDefault();closeLoreViewer();}
         if (event.key==='Tab' && !dialog.contains(document.activeElement)) {
             event.preventDefault();close.focus();
         }
     };
-    currentLoreViewer={overlay,onKeydown,previousFocus};
+    viewer.onKeydown = onKeydown;
+    currentLoreViewer = viewer;
     close.addEventListener('click',closeLoreViewer);
     overlay.addEventListener('click',event=>{if(event.target===overlay)closeLoreViewer();});
-    document.body.append(overlay);
+    document.documentElement.append(overlay);
     document.addEventListener('keydown',onKeydown);
+    window.addEventListener('resize',schedulePlaceViewer,{ passive: true });
+    window.addEventListener('orientationchange',schedulePlaceViewer,{ passive: true });
+    window.visualViewport?.addEventListener?.('resize',schedulePlaceViewer,{ passive: true });
+    window.visualViewport?.addEventListener?.('scroll',schedulePlaceViewer,{ passive: true });
+    placeViewer();
     close.focus();
     try {
         const data=await loadWorldInfo(entry.world);
@@ -343,6 +442,7 @@ async function showLoreViewer(entry) {
         const current=data?.entries?.[Number(entry.uid)];
         const full=current ? {...current,world:entry.world,uid:entry.uid} : entry;
         title.textContent=displayWiTitle(full);
+        schedulePlaceViewer();
         const source=String(full?.content ?? '');
         const managerText=displayWiBody(full);
         body.value=managerText;
@@ -357,6 +457,7 @@ async function showLoreViewer(entry) {
         if (currentLoreViewer?.overlay!==overlay) return;
         title.textContent=displayWiTitle(entry);
         body.value=String(entry?.content ?? '');
+        schedulePlaceViewer();
     }
 }
 
@@ -1618,6 +1719,7 @@ function endBuildSession() {
 
 // Optional teardown to remove UI and unpatch console
 window.STWII.destroy = function() {
+    closeLoreViewer();
     try { window.STWII.unpatchConsole?.(); } catch {}
     try {
         const t = window.STWII.trigger;

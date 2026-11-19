@@ -47,6 +47,8 @@
 
 .stwii--panel {
   filter: none;
+  border: 1px solid var(--SmartThemeBorderColor, currentColor);
+  border-color: color-mix(in srgb, var(--SmartThemeBodyColor, currentColor) 34%, transparent);
   z-index: 30000;
   overflow: auto;
   border-radius: 10px;
@@ -278,16 +280,23 @@
   background: rgba(0,0,0,.52);
 }
 .stwii--reader-dialog {
+  font-family: var(--mainFontFamily, inherit);
+  font-size: var(--mainFontSize, 1rem);
   display: flex; flex-direction: column; gap: 12px;
   box-sizing: border-box; width: min(660px, 100%); max-height: min(82dvh, 900px);
   min-width: 0; padding: 16px;
   border: 1px solid var(--SmartThemeBorderColor, currentColor);
+  border-color: color-mix(in srgb, var(--SmartThemeBodyColor, currentColor) 38%, transparent);
   border-radius: 12px;
   background: var(--secondaryBg, var(--SmartThemeBlurTintColor));
   color: var(--SmartThemeBodyColor, inherit);
   box-shadow: 0 12px 40px rgba(0,0,0,.38);
 }
-.stwii--reader-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; flex: 0 0 auto; }
+.stwii--reader-header {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;
+  flex: 0 0 auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
+}
+.stwii--reader-dialog.stwii--reader-dragging .stwii--reader-header { cursor: grabbing; }
 .stwii--reader-title { font-weight: 700; font-size: 1.05em; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; }
 .stwii--reader-close {
   flex: 0 0 32px; height: 32px; font-size: 24px; line-height: 1;
@@ -295,8 +304,8 @@
   border-radius: 8px; background: var(--SmartThemeBlurTintColor, transparent); color: inherit;
 }
 .stwii--reader-body {
-  box-sizing: border-box; display: block; width: 100%; min-height: 160px;
-  height: min(56dvh, 550px); max-height: 100%; margin: 0; padding: 12px;
+  box-sizing: border-box; display: block; width: 100%; min-height: 0;
+  flex: 1 1 auto; height: min(56dvh, 550px); max-height: 100%; margin: 0; padding: 12px;
   resize: none; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto;
   font: inherit; line-height: 1.6;
   border: 1px solid var(--SmartThemeBorderColor, currentColor);
@@ -304,5 +313,5 @@
 }
 @media (max-width:600px) {
   .stwii--reader-dialog { padding: 12px; max-height: 86dvh; }
-  .stwii--reader-body { min-height: 120px; height: 62dvh; }
+  .stwii--reader-body { min-height: 0; height: 62dvh; }
 }
