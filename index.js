@@ -10,6 +10,7 @@ import { world_info_position, world_names, loadWorldInfo, openWorldInfoEditor } 
 import { getRegexedString, regex_placement } from '../../regex/engine.js';
 import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
+import { showdown, DOMPurify } from '../../../../lib.js';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -287,6 +288,44 @@ async function rtTranslatedBody(entry) {
     return record.content;
 }
 
+
+// Use SillyTavern's bundled markdown renderer for read-only lore previews.
+// Render only when the viewer's content changes; never re-render the chat or book list.
+const wiLoreMarkdown = new showdown.Converter({
+    emoji: true,
+    literalMidWordUnderscores: true,
+    parseImgDimensions: true,
+    tables: true,
+    simpleLineBreaks: true,
+    strikethrough: true,
+    underline: true,
+});
+function renderLorePreview(target, source) {
+    const content = String(source ?? '');
+    try {
+        target.innerHTML = DOMPurify.sanitize(wiLoreMarkdown.makeHtml(content), {
+            USE_PROFILES: { html: true },
+            FORBID_TAGS: ['style', 'script', 'iframe', 'object', 'embed', 'form', 'input', 'select', 'button', 'textarea'],
+            FORBID_ATTR: ['style'],
+        });
+    } catch (error) {
+        // Even if the renderer is unavailable, keep a readable, safe fallback.
+        target.textContent = content;
+    }
+}
+function inheritLoreReaderFont(dialog) {
+    // This dialog is attached to <html> to avoid CSS transforms applied to
+    // <body>. Sample the actual chat text so custom themes still apply.
+    const sample = document.querySelector('#chat .mes_text, .mes_text') || document.body;
+    if (!sample) return;
+    const font = getComputedStyle(sample);
+    dialog.style.fontFamily = font.fontFamily;
+    dialog.style.fontSize = font.fontSize;
+    dialog.style.fontWeight = font.fontWeight;
+    dialog.style.lineHeight = font.lineHeight;
+    dialog.style.letterSpacing = font.letterSpacing;
+}
+
 let currentLoreViewer=null;
 function closeLoreViewer() {
     const viewer=currentLoreViewer;
@@ -320,12 +359,12 @@ async function showLoreViewer(entry) {
     close.className='stwii--reader-close';
     close.setAttribute('aria-label',wiT('reader.close'));
     close.textContent='×';
-    const body=document.createElement('textarea');
+    const body=document.createElement('div');
     body.className='stwii--reader-body';
+    body.setAttribute('role','document');
     body.setAttribute('aria-label',wiT('reader.body'));
-    body.readOnly=true;
-    body.spellcheck=false;
-    body.value=wiT('reader.loading');
+    body.tabIndex=0;
+    body.textContent=wiT('reader.loading');
     header.append(title,close);
     dialog.append(header,body);
     overlay.append(dialog);
@@ -429,6 +468,7 @@ async function showLoreViewer(entry) {
     close.addEventListener('click',closeLoreViewer);
     overlay.addEventListener('click',event=>{if(event.target===overlay)closeLoreViewer();});
     document.documentElement.append(overlay);
+    inheritLoreReaderFont(dialog);
     document.addEventListener('keydown',onKeydown);
     window.addEventListener('resize',schedulePlaceViewer,{ passive: true });
     window.addEventListener('orientationchange',schedulePlaceViewer,{ passive: true });
@@ -445,18 +485,18 @@ async function showLoreViewer(entry) {
         schedulePlaceViewer();
         const source=String(full?.content ?? '');
         const managerText=displayWiBody(full);
-        body.value=managerText;
+        renderLorePreview(body,managerText);
         // Prefer an existing, current Lorebook Manager translation. RT supplies
         // the body only when the manager has no usable translated body.
         if (managerText === source) {
             const rtText = await rtTranslatedBody(full);
             if (currentLoreViewer?.overlay !== overlay) return;
-            if (typeof rtText === 'string') body.value = rtText;
+            if (typeof rtText === 'string') renderLorePreview(body,rtText);
         }
     } catch {
         if (currentLoreViewer?.overlay!==overlay) return;
         title.textContent=displayWiTitle(entry);
-        body.value=String(entry?.content ?? '');
+        renderLorePreview(body,String(entry?.content ?? ''));
         schedulePlaceViewer();
     }
 }

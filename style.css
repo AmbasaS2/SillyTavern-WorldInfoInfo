@@ -280,8 +280,8 @@
   background: rgba(0,0,0,.52);
 }
 .stwii--reader-dialog {
-  font-family: var(--mainFontFamily, inherit);
-  font-size: var(--mainFontSize, 1rem);
+  font-family: inherit;
+  font-size: inherit;
   display: flex; flex-direction: column; gap: 12px;
   box-sizing: border-box; width: min(660px, 100%); max-height: min(82dvh, 900px);
   min-width: 0; padding: 16px;
@@ -297,7 +297,7 @@
   flex: 0 0 auto; cursor: grab; touch-action: none; user-select: none; -webkit-user-select: none;
 }
 .stwii--reader-dialog.stwii--reader-dragging .stwii--reader-header { cursor: grabbing; }
-.stwii--reader-title { font-weight: 700; font-size: 1.05em; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; }
+.stwii--reader-title { font-weight: 400; font-size: 1em; min-width: 0; overflow-wrap: anywhere; line-height: 1.4; }
 .stwii--reader-close {
   flex: 0 0 32px; height: 32px; font-size: 24px; line-height: 1;
   cursor: pointer; border: 1px solid var(--SmartThemeBorderColor, currentColor);
@@ -306,11 +306,30 @@
 .stwii--reader-body {
   box-sizing: border-box; display: block; width: 100%; min-height: 0;
   flex: 1 1 auto; height: min(56dvh, 550px); max-height: 100%; margin: 0; padding: 12px;
-  resize: none; white-space: pre-wrap; overflow-wrap: anywhere; overflow-y: auto;
-  font: inherit; line-height: 1.6;
+  white-space: normal; overflow-wrap: anywhere; overflow-y: auto;
+  font-family: inherit; font-size: inherit; font-weight: inherit; line-height: 1.6;
+  cursor: default; caret-color: transparent;
   border: 1px solid var(--SmartThemeBorderColor, currentColor);
   border-radius: 8px; background: var(--SmartThemeBlurTintColor, transparent); color: inherit;
 }
+/* Markdown content is displayed as formatted, selectable text, not an input. */
+.stwii--reader-body p { margin: 0 0 .85em; }
+.stwii--reader-body p:last-child { margin-bottom: 0; }
+.stwii--reader-body :is(h1,h2,h3,h4,h5,h6) {
+  font-family: inherit; line-height: 1.4; font-weight: 600;
+  margin: .85em 0 .4em;
+}
+.stwii--reader-body :is(h1,h2,h3,h4,h5,h6):first-child { margin-top: 0; }
+.stwii--reader-body strong, .stwii--reader-body b { font-weight: 700; }
+.stwii--reader-body em, .stwii--reader-body i { font-style: italic; }
+.stwii--reader-body :is(ul,ol) { margin: .5em 0; padding-left: 1.55em; }
+.stwii--reader-body blockquote {
+  margin: .75em 0; padding-left: .85em;
+  border-left: 2px solid var(--SmartThemeQuoteColor, currentColor);
+}
+.stwii--reader-body pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+.stwii--reader-body :is(img,video,table) { max-width: 100%; }
+.stwii--reader-body a { overflow-wrap: anywhere; }
 @media (max-width:600px) {
   .stwii--reader-dialog { padding: 12px; max-height: 86dvh; }
   .stwii--reader-body { min-height: 0; height: 62dvh; }
