@@ -13,6 +13,7 @@ import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { showdown, DOMPurify } from '../../../../lib.js';
 import { tryOpenInLoreLibrary } from './lore-library-link.js';
+import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -201,40 +202,18 @@ const getStrategy = (entry)=>{
 };
 
 
-// 2026-11-18 fork: display-only compatibility with Lorebook Manager; no writes to its data.
-function displayWiTitle(entry) {
+// Preserve the legacy in-memory translations for older Lorebook Manager
+// versions. Newer versions use per-book files, read on viewer open only.
+function displayWiTitle(entry, snapshot = null) {
     const source = String(entry?.comment ?? '');
-    const original = source.trim() || (Array.isArray(entry?.key) ? entry.key : entry?.keys ?? []).join(', ');
-    const settings = extension_settings['simple-lorebook'];
-    const id = String(entry?.world ?? '') + '\u241f' + String(entry?.uid ?? '');
-    const record = settings?.translations?.[id];
-    const language = settings?.entryLanguagePairs?.[id]?.translationLanguage;
-    const title = record?.fields?.comment;
-    if (record?.language !== 'Korean' || (language && language !== 'Korean') || title?.source !== source) return original;
-    return typeof title?.text === 'string' && title.text.trim() ? title.text.trim() : original;
+    const original = source.trim()
+        || (Array.isArray(entry?.key) ? entry.key : entry?.keys ?? []).join(', ');
+    return managerTranslatedTitle(entry, snapshot, extension_settings['simple-lorebook']) || original;
 }
 
-
-// Read-only body preview: the manager stores a hash of the original body.
-function loreBodyHash(source) {
-    const value=String(source ?? '');
-    let hash=2166136261;
-    for (let i=0; i<value.length; i++) {
-        hash ^= value.charCodeAt(i);
-        hash = Math.imul(hash, 16777619) >>> 0;
-    }
-    return hash.toString(36) + '_' + value.length;
-}
-function displayWiBody(entry) {
-    const source=String(entry?.content ?? '');
-    const settings=extension_settings['simple-lorebook'];
-    const id=String(entry?.world ?? '') + '\u241f' + String(entry?.uid ?? '');
-    const record=settings?.translations?.[id];
-    const language=settings?.entryLanguagePairs?.[id]?.translationLanguage;
-    const usable=record?.language==='Korean' && (!language || language==='Korean')
-        && record.sourceHash===loreBodyHash(source);
-    return usable && typeof record.text==='string' && record.text.trim()
-        ? record.text : source;
+function displayWiBody(entry, snapshot = null) {
+    const source = String(entry?.content ?? '');
+    return managerTranslatedBody(entry, snapshot, extension_settings['simple-lorebook']) ?? source;
 }
 
 // Cherry&Solti RT stores read-only translation results in one file per lorebook.
@@ -621,14 +600,24 @@ async function showLoreViewer(entry) {
     placeViewer();
     close.focus();
     try {
-        const data=await loadWorldInfo(entry.world);
+        // One on-demand, read-only request for this book's current translation
+        // snapshot; start beside the existing WorldInfo read, never at startup,
+        // while scanning prompts, or when rendering the injected-entry list.
+        const hasManager = Boolean(extension_settings['simple-lorebook'] || window.__slbLoreManagerActive);
+        const [data, translationFile] = await Promise.all([
+            loadWorldInfo(entry.world),
+            hasManager
+                ? readManagerTranslationBook(entry.world, (url, options) => fetch(url, options),
+                    getContext?.()?.getRequestHeaders?.())
+                : Promise.resolve(null),
+        ]);
         if (currentLoreViewer?.overlay!==overlay) return;
         const current=data?.entries?.[Number(entry.uid)];
         const full=current ? {...current,world:entry.world,uid:entry.uid} : entry;
-        title.textContent=displayWiTitle(full);
+        title.textContent=displayWiTitle(full, translationFile);
         schedulePlaceViewer();
         const source=String(full?.content ?? '');
-        const managerText=displayWiBody(full);
+        const managerText=displayWiBody(full, translationFile);
         renderLorePreview(body,managerText);
         // Prefer an existing, current Lorebook Manager translation. RT supplies
         // the body only when the manager has no usable translated body.

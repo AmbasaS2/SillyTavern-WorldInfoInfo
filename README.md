@@ -31,6 +31,10 @@ Right-click the floating book button (or long-press on mobile) and enable **ë¡œì
 When enabled and Ambasa's Lorebook Manager v1.4.85-ambasa.65 or later is running, clicking an injected lore entry opens the exact lorebook and UID in the independent floating Lorebook Library. Matching uses book name and UID, not a possibly duplicated/translated title. If the manager is absent, disabled, incompatible, or cannot open that entry, the existing WorldInfo Info read-only floating viewer opens instead.
 
 This option changes only on-click navigation: no lorebook, translation, activation or generation data is written. The original floating viewer continues to show activation explanations when used.
+### Original floating reader: saved translations
+
+With the optional Lorebook Manager installed, the original WorldInfo Info reader now looks up the current **per-lorebook translation JSON** when you click an injected entry. Its translated title and body are read-only. Existing in-memory legacy translations and Cherry&Solti translation fallback remain supported; original text is shown if a translation is missing, stale, or unavailable. The new file lookup happens **once on viewer open** (not during prompt generation or list display), with no observer, polling, automatic AI call, or settings/file write.
+
 ## License
 
 This project is licensed under the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE).
