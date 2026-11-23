@@ -2319,7 +2319,7 @@ window.STWII.destroy = function() {
             // Build frequency map: keyword -> { count, entries: Set<string> }
             const freq = new Map();
             const sanitizeComment = (s) => typeof s === 'string'
-                ? s.replace(/\s*-\s*S[0-9][0-9A-Za-z.\-]*\s*$/, '').trim()
+                ? s.trim().replace(/-\s*S[0-9][0-9A-Za-z.\-]*$/, '').trim()
                 : '';
             const fmtEntry = (e) => {
                 const c = sanitizeComment(displayWiTitle({ ...e, key: e.keys }));
