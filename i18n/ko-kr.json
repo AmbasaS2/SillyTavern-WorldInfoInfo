@@ -8,6 +8,8 @@
   "worldInfoInfo.settings.messages.hint": "로어북별 묶기를 해제하고 주입 순서를 켜면, 로어 사이의 대화 메시지 위치도 함께 표시합니다.",
   "worldInfoInfo.settings.tokens.label": "주입 로어 토큰 합계 표시",
   "worldInfoInfo.settings.tokens.hint": "켜면 목록을 열었을 때만 주입된 로어의 토큰 수를 대략 계산합니다. 답변 생성 중에는 계산하지 않습니다.",
+  "worldInfoInfo.settings.library.label": "로어북 서가 연동",
+  "worldInfoInfo.settings.library.hint": "켜면 주입된 로어를 클릭할 때 로어북 매니저의 독립 서재에서 해당 기록을 엽니다. 이용할 수 없으면 기존 열람창을 엽니다.",
   "worldInfoInfo.panel.tokens.label": "주입 로어 총합",
   "worldInfoInfo.panel.tokens.value": "약 {0} 토큰",
   "worldInfoInfo.panel.tokens.calculating": "계산 중…",
