@@ -12,6 +12,7 @@ import { getTokenCountAsync } from '../../../tokenizers.js';
 import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { showdown, DOMPurify } from '../../../../lib.js';
+import { tryOpenInLoreLibrary } from './lore-library-link.js';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -25,6 +26,8 @@ const WI_UI_EN = {
     "settings.messages.hint": "Show the chat messages between injected lore entries when grouping is off and injection order is on.",
     "settings.tokens.label": "Show injected lore token total",
     "settings.tokens.hint": "Optional estimate when you open the list. No token counting during generation.",
+    "settings.library.label": "Link Lorebook Library",
+    "settings.library.hint": "When available, open the clicked injected lore in the independent Lorebook Library. Otherwise use the existing reader.",
     "panel.tokens.label": "Injected lore total",
     "panel.tokens.value": "~{0} tokens",
     "panel.tokens.calculating": "Counting…",
@@ -437,6 +440,23 @@ function describeLoreActivation(entry) {
     return causes.length ? causes.join(' + ') : '❔ ' + wiT('reader.reason.unknown');
 }
 
+// Evaluate the option and the bridge only on an actual entry click.
+// No manager installed, option off, or navigation failure => original viewer.
+let linkedLoreClickSerial = 0;
+async function showInjectedLore(entry) {
+    const serial = ++linkedLoreClickSerial;
+    const enabled = extension_settings.worldInfoInfo?.linkLoreLibrary === true;
+    const bridge = window.__slbLoreLibraryBridge;
+    if (!enabled || bridge?.apiVersion !== 1 || typeof bridge.openEntry !== 'function') {
+        void showLoreViewer(entry);
+        return;
+    }
+    const opened = await tryOpenInLoreLibrary(entry, true, bridge);
+    if (serial !== linkedLoreClickSerial) return;
+    if (opened) closeLoreViewer();
+    else void showLoreViewer(entry);
+}
+
 let currentLoreViewer=null;
 function closeLoreViewer() {
     const viewer=currentLoreViewer;
@@ -802,6 +822,24 @@ const init = ()=>{
             lbl.textContent = wiT('settings.tokens.label');
             tokenRow.append(cb, lbl);
             configPanel.append(tokenRow);
+        }
+        // Optional bridge to Lorebook Manager's standalone library. Disabled
+        // unless explicitly selected; never starts a manager or AI task.
+        const libraryRow = document.createElement('label'); {
+            libraryRow.classList.add('stwii--configRow');
+            libraryRow.title = wiT('settings.library.hint');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = extension_settings.worldInfoInfo?.linkLoreLibrary === true;
+            cb.addEventListener('change', () => {
+                if (!extension_settings.worldInfoInfo) extension_settings.worldInfoInfo = {};
+                extension_settings.worldInfoInfo.linkLoreLibrary = cb.checked;
+                saveSettingsDebounced();
+            });
+            const lbl = document.createElement('div');
+            lbl.textContent = wiT('settings.library.label');
+            libraryRow.append(cb, lbl);
+            configPanel.append(libraryRow);
         }
         // Drag-to-move toggle
         const dragRow = document.createElement('label'); {
@@ -1525,11 +1563,11 @@ const init = ()=>{
                             e.classList.add('stwii--actionable');
                             e.tabIndex = 0;
                             e.setAttribute('role', 'button');
-                            e.addEventListener('click', () => showLoreViewer(entry));
+                            e.addEventListener('click', () => void showInjectedLore(entry));
                             e.addEventListener('keydown', (event) => {
                                 if (event.key !== 'Enter' && event.key !== ' ') return;
                                 event.preventDefault();
-                                showLoreViewer(entry);
+                                void showInjectedLore(entry);
                             });
                         }
                         const wipEx = [world_info_position.EMTop, world_info_position.EMBottom];
@@ -2105,6 +2143,7 @@ window.STWII.destroy = function() {
         eventSource.removeListener?.(event_types.GENERATION_ENDED, onCompletedGeneration);
         eventSource.removeListener?.(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
     } catch {}
+    linkedLoreClickSerial++;
     closeLoreViewer();
     try { window.STWII.unpatchConsole?.(); } catch {}
     try {
