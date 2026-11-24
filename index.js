@@ -13,6 +13,7 @@ import { isAdmin, getCurrentUserHandle } from '../../../user.js';
 import { Popup, POPUP_TYPE } from '../../../popup.js';
 import { showdown, DOMPurify } from '../../../../lib.js';
 import { tryOpenInLoreLibrary } from './lore-library-link.js';
+import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 
 
@@ -60,6 +61,7 @@ const WI_UI_EN = {
     "reader.reason.keyword": "Keyword match",
     "reader.reason.vector": "Vector search",
     "reader.reason.constant": "Always active",
+    "reader.reason.jev": "Jev memory recall",
     "reader.reason.sticky": "Sticky continuation",
     "reader.reason.external": "External activation",
     "reader.reason.decorator": "@@activate directive",
@@ -190,8 +192,10 @@ const strategy = {
     constant: '🔵',
     normal: '🟢',
     vectorized: '🔗',
+    jev: '🧠 Jev',
 };
 const getStrategy = (entry)=>{
+    if (entry.stwiiJevRecall === true) return 'jev';
     if (entry.constant === true) {
         return 'constant';
     } else if (entry.vectorized === true) {
@@ -392,6 +396,8 @@ function matchLoreReaderChatTypography(dialog, body) {
 // compact /wi-report event. Do not rescan lore, query vectors, or parse logs
 // when the reader opens. A missing event is not evidence of vector activation.
 function describeLoreActivation(entry) {
+    // Jev evidence belongs to this displayed entry, not the saved constant flag.
+    if (entry?.stwiiJevRecall === true) return '🧠 ' + wiT('reader.reason.jev');
     const events = chat_metadata.stwiiLastReport?.added;
     const ev = Array.isArray(events) ? events.find(item =>
         item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null;
@@ -1154,6 +1160,21 @@ const init = ()=>{
     let pendingEntries = [];
     let generationSerial = 0;
     let realGenerationInProgress = false;
+    const jevRecall = createJevRecallReceipts();
+    // Memory Books calls this after applying its selection in WORLDINFO_ENTRIES_LOADED.
+    // Its makeFirst listener runs before our normal listener; match the exact lists object.
+    const recordJevRecall = (lists, world, uids) => {
+        if (!realGenerationInProgress || stwiiDryRunActive) return false;
+        return jevRecall.record(lists, world, uids);
+    };
+    STWII.recordJevRecall = recordJevRecall;
+    const onWorldInfoEntriesLoaded = (lists) => {
+        if (!realGenerationInProgress || stwiiDryRunActive) return;
+        jevRecall.consume(lists);
+    };
+    const resetJevRecall = () => jevRecall.reset();
+    eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
+    eventSource.on(event_types.GENERATION_STOPPED, resetJevRecall);
     let lastReportBuild = null;
     let lastRenderedGenerationEntries = null;
     let finalizedTokenGeneration = -1;
@@ -1238,7 +1259,7 @@ const init = ()=>{
     // original extension. Delay only outlet entries until prompt verification.
     function renderGenerationEntries(list) {
         const signature = generationSerial + ':' + list.map(entry =>
-            String(entry.world) + '§§§' + String(entry.uid) + '§§§' + String(entry.sticky || 0)).join('|');
+            String(entry.world) + '§§§' + String(entry.uid) + '§§§' + String(entry.sticky || 0) + '§§§' + (entry.stwiiJevRecall === true ? 'jev' : '')).join('|');
         currentEntryList = [...list];
         if (signature === lastRenderedGenerationEntries) return;
         lastRenderedGenerationEntries = signature;
@@ -1254,6 +1275,7 @@ const init = ()=>{
         // reply's World Info. A quietToLoud generation *is* user-visible.
         if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
         generationSerial++;
+        jevRecall.reset();
         realGenerationInProgress = true;
         tokenGenerationAwaitingEnd = true;
         tokenSummaryRequest++;
@@ -1279,6 +1301,7 @@ const init = ()=>{
     eventSource.on(event_types.GENERATION_STARTED, beginRealGeneration);
     eventSource.on(event_types.CHAT_CHANGED, () => {
         generationSerial++;
+        jevRecall.reset();
         realGenerationInProgress = false;
         tokenGenerationAwaitingEnd = false;
         tokenSummaryRequest++;
@@ -1319,7 +1342,7 @@ const init = ()=>{
                 const end = Number(effect?.end);
                 const remaining = Number.isInteger(scanned) && scanned >= 0
                     && Number.isFinite(end) ? Math.max(0, Math.trunc(end - scanned)) : 0;
-                return { ...entry, type: 'wi', sticky: remaining };
+                return jevRecall.annotate({ ...entry, type: 'wi', sticky: remaining });
             });
         pendingEntries = filtered;
 
@@ -1334,6 +1357,7 @@ const init = ()=>{
         if (dryRun || !realGenerationInProgress) return;
         realGenerationInProgress = false;
         const included = confirmedWiEntries(pendingEntries, data);
+        jevRecall.reset();
         pendingEntries = [];
         // Repaint only if an outlet is confirmed or sticky metadata changed;
         // otherwise keep the already-built DOM and instant button response.
@@ -1346,7 +1370,14 @@ const init = ()=>{
         // Persist one compact report; never persist the intercepted console logs.
         const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
         const build = lastReportBuild?.chatId === getCurrentChatId() ? lastReportBuild : null;
-        if (build) build.added = build.added.filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)));
+        if (build) {
+            const jevIds = new Set(included.filter(entry => entry.stwiiJevRecall === true)
+                .map(entry => String(entry.world) + ':' + String(entry.uid)));
+            build.added = build.added.filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)))
+                .map(ev => jevIds.has(String(ev.world) + ':' + String(ev.uid))
+                    ? { ...ev, jevConfirmed: true, logic: 'JEV', reason: 'jev', primary: null, secondary: [], vectorConfirmed: false }
+                    : ev);
+        }
         chat_metadata.stwiiLastReport = {
             runId: build?.runId ?? Date.now(),
             added: build?.added ?? [],
@@ -1580,6 +1611,7 @@ const init = ()=>{
                             if (entry.type == 'wi') {
                                 title.textContent = displayWiTitle(entry);
                                 e.title = '[' + entry.world + '] ' + displayWiTitle(entry);
+                                if (entry.stwiiJevRecall === true) e.title += '\n' + wiT('reader.reason.jev');
                             } else if (entry.type == 'mes') {
                                 const first = document.createElement('div'); {
                                     first.classList.add('stwii--first');
@@ -2131,7 +2163,11 @@ window.STWII.destroy = function() {
     try {
         eventSource.removeListener?.(event_types.GENERATION_ENDED, onCompletedGeneration);
         eventSource.removeListener?.(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
+        eventSource.removeListener?.(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
+        eventSource.removeListener?.(event_types.GENERATION_STOPPED, resetJevRecall);
     } catch {}
+    if (STWII.recordJevRecall === recordJevRecall) delete STWII.recordJevRecall;
+    jevRecall.reset();
     linkedLoreClickSerial++;
     closeLoreViewer();
     try { window.STWII.unpatchConsole?.(); } catch {}
@@ -2368,6 +2404,8 @@ window.STWII.destroy = function() {
 
             if (events.length) {
                 for (const ev of events) {
+                    // Jev is a recall source, not a matched keyword.
+                    if (ev.jevConfirmed === true) continue;
                     const entryIdent = fmtEntry(ev);
                     const ov = overrideById.get(`${ev.world}:${ev.uid}`) || parseFromLogsByUid(logLines, ev.uid, ev.world) || null;
                     const primaryUse = ov && ov.primary ? ov.primary : (ev.primary || null);
@@ -2548,6 +2586,11 @@ window.STWII.destroy = function() {
                     for (const ev of list) {
                         const li = document.createElement('li');
                         li.textContent = fmtEntry(ev);
+                        if (ev.jevConfirmed === true) {
+                            li.textContent += ' · 🧠 ' + wiT('reader.reason.jev');
+                            ul.append(li);
+                            continue;
+                        }
 
                         // Highlight constants
                         if (ev && ev.constant === true) {
