@@ -44,15 +44,15 @@ Select an entry in the list to open a floating reader rather than navigate away 
 
 The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation.
 
-### 🔮 Jev Memory Recall (upcoming)
+### 🔮 Jev Recall via STLO (upcoming)
 
-With the compatible [Memory Books fork](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) and its Jev recall mode enabled, memories selected by Jev and included in the current RP's injected lore list are marked **🔮 Jev**, separately from ordinary always-active entries.
+With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev recall for the lorebooks you want STLO to search. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
 
-Open a recalled memory to read its contents or an available saved translation. The reader identifies Jev as the activation source; recorded Jev entries are also identified in the recursion report. The optional lore token total includes these memories as part of the injected list.
+This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
 
-This integration uses the selection already made by Memory Books. It does not call Jev again or add memories to the prompt. Candidates that do not make it into the injected lore list are not added for display.
+WorldInfo Info uses STLO's existing selection and the final World Info activation results. It does not call Jev again, search lorebooks again, change the prompt or bypass token budgets. Entries rejected by STLO or SillyTavern's activation rules are not added for display.
 
-**Release status:** Implemented in the integration branches; not available in the current public release (v1.7.1-ambasa.3). Both extensions need the compatible update.
+**Release status:** The STLO display integration is implemented and undergoing release verification. It is not included in the current WorldInfo Info public release (v1.7.1-ambasa.3); compatible updates to both forks are required.
 
 ### 🌐 Read Existing Translations
 
