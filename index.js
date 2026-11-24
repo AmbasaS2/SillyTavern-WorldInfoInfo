@@ -953,9 +953,9 @@ const init = ()=>{
             : left >= bounds.left + margin ? left
             : clamp(right, bounds.left + margin, bounds.right - pw - margin);
 
-        // Align the panel's center with the icon, rather than placing it a
-        // whole panel-height above the icon. Clamp for small viewports.
-        const y = clamp(tr.top + (tr.height - ph) / 2,
+        // Restore top alignment for the injected-entry list. Keep the settings
+        // panel's existing centering and clamp both to the visible viewport.
+        const y = clamp(el === panel ? tr.top : tr.top + (tr.height - ph) / 2,
             bounds.top + margin, bounds.bottom - ph - margin);
 
         el.style.position = 'fixed';
