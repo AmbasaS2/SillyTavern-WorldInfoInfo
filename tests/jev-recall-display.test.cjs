@@ -1,56 +1,69 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-test('only applied Jev IDs from the exact WI load are marked', async () => {
+const key = (world, uid) => JSON.stringify([world, uid]);
+const entry = (world, uid, extra = {}) => ({ world, uid, constant: false, vectorized: false, decorators: ['@@activate'], ...extra });
+const marked = e => e.stwiiJevRecall === true;
+async function create() {
     const { createJevRecallReceipts } = await import('../jev-recall-display.js');
-    const r = createJevRecallReceipts();
+    return createJevRecallReceipts();
+}
+
+test('marks only STLO-selected entries surviving the actual activation event, across books with duplicate UIDs', async () => {
+    const r = await create();
     const lists = {};
-    const a = { world: 'Memory A', uid: 5, constant: true };
-    const b = { world: 'Memory A', uid: 6, constant: true };
-    const sameUidOtherWorld = { world: 'Memory B', uid: 5, constant: true };
-    assert.equal(r.record(lists, 'Memory A', new Set([5, 8])), true);
+    const a = entry('Memory A', 5), b = entry('World lore', 5);
+    const c = entry('Other book', 5), constant = entry('Memory A', 7, { constant: true });
+    r.record(lists, new Set([key('Memory A', 5), key('World lore', 5), key('Memory A', 8), key('Memory A', 7)]));
     r.consume(lists);
-    assert.deepEqual(r.annotate(a), { ...a, stwiiJevRecall: true });
-    assert.deepEqual(r.annotate(b), b);
-    assert.deepEqual(r.annotate(sameUidOtherWorld), sameUidOtherWorld);
+    const actual = [a, b, c, constant].map(e => r.annotate(e));
+    assert.deepEqual(actual.filter(marked).map(e => [e.world, e.uid]), [['Memory A', 5], ['World lore', 5]]);
+    assert.equal(actual.length, 4);
     assert.equal(a.stwiiJevRecall, undefined);
-    // The other selected candidate is never added to the activated list.
-    assert.equal([a, b].map(e => r.annotate(e)).filter(e => e.stwiiJevRecall).length, 1);
 });
 
-test('native activation, invalid IDs, unrelated scans and reset cannot inherit Jev evidence', async () => {
-    const { createJevRecallReceipts } = await import('../jev-recall-display.js');
-    const r = createJevRecallReceipts();
-    const lists = {};
-    const a = { world: 'Memory A', uid: 5, constant: true };
-    assert.equal(r.record(null, 'Memory A', [5]), false);
-    r.record(lists, 'Memory A', ['5', null, '', -1, NaN]);
-    r.consume({});
-    assert.deepEqual(r.annotate(a), a);
+test('STLO receipts work before or after the receiver sees the same event payload', async () => {
+    const r = await create();
+    const first = {}, second = {};
+    const a = entry('A', 2);
+    r.record(first, new Set([key('A', 2)]));
+    r.consume(first);
+    assert.equal(marked(r.annotate(a)), true);
+    r.consume(second);
+    assert.equal(marked(r.annotate(a)), false);
+    r.record(second, new Set([key('A', 2)]));
+    assert.equal(marked(r.annotate(a)), true);
+    r.record(first, new Set([key('B', 3)]));
+    assert.equal(marked(r.annotate(entry('B', 3))), false);
+    assert.equal(marked(r.annotate(a)), true);
+});
+
+test('no receipt, native decorator, disabled entries, invalid IDs and former Memory Books API do not mark', async () => {
+    const r = await create(), lists = {};
+    const a = entry('A', 5);
+    assert.equal(r.record(null, new Set([key('A', 5)])), false);
+    assert.equal(r.record(lists, 'A', new Set([5])), false);
     r.consume(lists);
-    assert.equal(r.annotate(a).stwiiJevRecall, true);
-    assert.equal(r.annotate({ ...a, constant: false }).stwiiJevRecall, undefined);
-    assert.equal(r.annotate({ ...a, disable: true }).stwiiJevRecall, undefined);
-    assert.equal(r.annotate({ ...a, uid: null }).stwiiJevRecall, undefined);
+    assert.equal(marked(r.annotate(a)), false);
+    r.record(lists, new Set([key('A', '5'), key('A', null), key('A', ''), key('A', -1), 'bad', null]));
+    assert.equal(marked(r.annotate(a)), true);
+    assert.equal(marked(r.annotate(entry('A', null))), false);
+    assert.equal(marked(r.annotate(entry('A', 5, { decorators: [] }))), false);
+    assert.equal(marked(r.annotate(entry('A', 5, { disable: true }))), false);
+    assert.equal(marked(r.annotate(entry('A', 5, { constant: true }))), false);
+    r.record(lists, new Set());
+    assert.equal(marked(r.annotate(a)), false);
+    assert.equal(marked(r.annotate({ ...a, stwiiJevRecall: true })), false);
+});
+
+test('chat/generation reset clears receipts but preserves displayed snapshots', async () => {
+    const r = await create(), lists = {};
+    const a = entry('A', 5);
+    r.record(lists, new Set([key('A', 5)]));
     r.consume(lists);
-    assert.deepEqual(r.annotate(a), a);
-    r.record(lists, 'Memory A', [5]);
+    const displayed = r.annotate(a);
     r.reset();
     r.consume(lists);
-    assert.deepEqual(r.annotate(a), a);
-    assert.equal(r.annotate({ ...a, stwiiJevRecall: true }).stwiiJevRecall, undefined);
-});
-
-test('a later WI load without a receipt clears an earlier selection', async () => {
-    const { createJevRecallReceipts } = await import('../jev-recall-display.js');
-    const r = createJevRecallReceipts();
-    const lists = {};
-    const entry = { world: 'Memory', uid: 1, constant: true };
-    r.record(lists, 'Memory', [1]);
-    r.consume(lists);
-    const displayed = r.annotate(entry);
-    r.consume({});
-    assert.equal(r.annotate(entry).stwiiJevRecall, undefined);
-    // Previously displayed copy remains stable during unrelated scans.
-    assert.equal(displayed.stwiiJevRecall, true);
+    assert.equal(marked(r.annotate(a)), false);
+    assert.equal(marked(displayed), true);
 });
