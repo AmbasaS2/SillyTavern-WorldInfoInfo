@@ -1161,13 +1161,13 @@ const init = ()=>{
     let generationSerial = 0;
     let realGenerationInProgress = false;
     const jevRecall = createJevRecallReceipts();
-    // Memory Books calls this after applying its selection in WORLDINFO_ENTRIES_LOADED.
-    // Its makeFirst listener runs before our normal listener; match the exact lists object.
-    const recordJevRecall = (lists, world, uids) => {
+    // STLO reports only the entries it actually prepared for this WI scan.
+    // The exact event payload binds its receipt to this generation.
+    const recordStloJevRecall = (lists, appliedKeys) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return false;
-        return jevRecall.record(lists, world, uids);
+        return jevRecall.record(lists, appliedKeys);
     };
-    STWII.recordJevRecall = recordJevRecall;
+    STWII.recordStloJevRecall = recordStloJevRecall;
     const onWorldInfoEntriesLoaded = (lists) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         jevRecall.consume(lists);
@@ -2166,7 +2166,7 @@ window.STWII.destroy = function() {
         eventSource.removeListener?.(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
         eventSource.removeListener?.(event_types.GENERATION_STOPPED, resetJevRecall);
     } catch {}
-    if (STWII.recordJevRecall === recordJevRecall) delete STWII.recordJevRecall;
+    if (STWII.recordStloJevRecall === recordStloJevRecall) delete STWII.recordStloJevRecall;
     jevRecall.reset();
     linkedLoreClickSerial++;
     closeLoreViewer();
