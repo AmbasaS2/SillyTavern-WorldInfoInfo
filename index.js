@@ -192,7 +192,7 @@ const strategy = {
     constant: '🔵',
     normal: '🟢',
     vectorized: '🔗',
-    jev: '🧠 Jev',
+    jev: '🔮 Jev',
 };
 const getStrategy = (entry)=>{
     if (entry.stwiiJevRecall === true) return 'jev';
@@ -397,7 +397,7 @@ function matchLoreReaderChatTypography(dialog, body) {
 // when the reader opens. A missing event is not evidence of vector activation.
 function describeLoreActivation(entry) {
     // Jev evidence belongs to this displayed entry, not the saved constant flag.
-    if (entry?.stwiiJevRecall === true) return '🧠 ' + wiT('reader.reason.jev');
+    if (entry?.stwiiJevRecall === true) return '🔮 ' + wiT('reader.reason.jev');
     const events = chat_metadata.stwiiLastReport?.added;
     const ev = Array.isArray(events) ? events.find(item =>
         item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null;
@@ -2587,7 +2587,7 @@ window.STWII.destroy = function() {
                         const li = document.createElement('li');
                         li.textContent = fmtEntry(ev);
                         if (ev.jevConfirmed === true) {
-                            li.textContent += ' · 🧠 ' + wiT('reader.reason.jev');
+                            li.textContent += ' · 🔮 ' + wiT('reader.reason.jev');
                             ul.append(li);
                             continue;
                         }
