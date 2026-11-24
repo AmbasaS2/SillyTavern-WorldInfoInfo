@@ -2,7 +2,7 @@
 
 **WorldInfo Info is a SillyTavern extension for inspecting the lorebook entries activated for the current roleplay reply, reading their contents, and checking recorded activation reasons without leaving the chat.**
 
-This is a personal fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), itself based on [LenAnderson's original WorldInfo Info](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo). The floating book, activation list and keyword/recursion report are the work this fork builds upon. Thank you to both authors for making this workflow possible.
+This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), itself based on [LenAnderson's original WorldInfo Info](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo). The floating book, activation list and keyword/recursion report are the work this fork builds upon. Thank you to both authors for making this workflow possible.
 
 ## 📸 UI Preview
 
@@ -114,7 +114,7 @@ Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohana
 | Navigation | Opens the native lorebook editor. | Optional exact-entry navigation to the independent Lorebook Library. |
 | Controls and display | Floating button, grouping, ordering, dragging and reset. | Keeps those controls; adds mobile long-press settings, localized UI and viewport-safe themed panels. |
 
-The intent is to offer a different reading workflow for personal RP use, not to replace the original authors' approach. The original keyword/recursion report and floating list remain central to this fork.
+This fork focuses on reading and inspecting lore directly during RP. The original keyword/recursion report and floating list remain central to this fork.
 
 ## 🪶 Scope and Performance
 
@@ -126,6 +126,6 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 
 - **Original extension:** [LenAnderson/SillyTavern-WorldInfoInfo](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo)
 - **Direct upstream fork:** [aikohanasaki/SillyTavern-WorldInfoInfo](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo) — including the floating button movement, click-to-open navigation, and `/wi-report`.
-- **This fork:** AmbasaS2 — personal reading-oriented additions and optional integrations.
+- **This fork:** AmbasaS2 — reading-oriented additions and optional integrations.
 
 This project retains the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE).
