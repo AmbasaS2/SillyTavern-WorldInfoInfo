@@ -1255,6 +1255,7 @@ const init = ()=>{
         if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
         generationSerial++;
         realGenerationInProgress = true;
+        stwiiDryRunActive = false;
         tokenGenerationAwaitingEnd = true;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
@@ -1952,11 +1953,14 @@ function endBuildSession() {
         STWII.origLog = console.log;
     const original_debug = console.debug;
     console.debug = function(...args) {
+        if (!realGenerationInProgress) return original_debug.apply(console, args);
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
             firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
             || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
         )) return original_debug.apply(console, args);
+        if (firstArg.includes('[WI] --- START WI SCAN')) stwiiDryRunActive = firstArg.includes('(DRY RUN)');
+        if (stwiiDryRunActive) return original_debug.apply(console, args);
         // capture WI activation details
         try { handleWiDebugArgs(args); } catch {}
 
@@ -2025,11 +2029,14 @@ function endBuildSession() {
     };
     const original_log = console.log;
     console.log = function(...args) {
+        if (!realGenerationInProgress) return original_log.apply(console, args);
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
             firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
             || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
         )) return original_log.apply(console, args);
+        if (firstArg.includes('[WI] --- START WI SCAN')) stwiiDryRunActive = firstArg.includes('(DRY RUN)');
+        if (stwiiDryRunActive) return original_log.apply(console, args);
         // capture WI activation details (just in case)
         try { handleWiDebugArgs(args); } catch {}
 
