@@ -44,6 +44,16 @@ Select an entry in the list to open a floating reader rather than navigate away 
 
 The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation.
 
+### 🔮 Jev Memory Recall (upcoming)
+
+With the compatible [Memory Books fork](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) and its Jev recall mode enabled, memories selected by Jev and included in the current RP's injected lore list are marked **🔮 Jev**, separately from ordinary always-active entries.
+
+Open a recalled memory to read its contents or an available saved translation. The reader identifies Jev as the activation source; recorded Jev entries are also identified in the recursion report. The optional lore token total includes these memories as part of the injected list.
+
+This integration uses the selection already made by Memory Books. It does not call Jev again or add memories to the prompt. Candidates that do not make it into the injected lore list are not added for display.
+
+**Release status:** Implemented in the integration branches; not available in the current public release (v1.7.1-ambasa.3). Both extensions need the compatible update.
+
 ### 🌐 Read Existing Translations
 
 If compatible saved translations exist, the reader can display them without translating the entry again.
