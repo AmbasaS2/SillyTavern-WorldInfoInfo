@@ -4,6 +4,16 @@
 
 This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), itself based on [LenAnderson's original WorldInfo Info](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo). The floating book, activation list and keyword/recursion report are the work this fork builds upon. Thank you to both authors for making this workflow possible.
 
+[한국어 안내 ↓](#-월드인포인포--ambasa-포크) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd4818892b4c763c1bcc4b5)
+
+**Use this when you want to inspect what lore was activated, not change what is injected.**
+
+## Who is this for?
+
+- Players who want to understand why their character forgot a fact or recalled an unexpected entry.
+- Players who want to read previously saved lore translations without opening the editor or paying for another translation.
+- Players who want a quick lore-only token estimate or an optional shortcut to the Lorebook Manager library.
+
 ## 📸 UI Preview
 
 <p align="center">
@@ -44,9 +54,11 @@ Select an entry in the list to open a floating reader rather than navigate away 
 
 The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation.
 
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="Configured strategy vs recorded activation reason / 설정과 발동 이유" width="860" /></p>
+
 ### 🔮 Jev Recall via STLO (upcoming)
 
-With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev recall for the lorebooks you want STLO to search. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
+With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
 
 This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
 
@@ -131,6 +143,74 @@ This fork focuses on reading and inspecting lore directly during RP. The origina
 The extension observes existing generation events rather than performing a second lorebook activation scan. Sticky metadata is read from existing in-memory state. Opening the list toggles already-rendered entries. Translation lookup is scoped to the selected book when the reader is opened; there is no new polling or automatic AI translation. Optional token counting waits until the reply ends.
 
 WorldInfo Info does not decide what lore should be activated or injected. The core activation rules, probability, budget, recursion, and prompt assembly remain SillyTavern's responsibility.
+
+---
+
+# 📚 월드인포인포 — Ambasa 포크
+
+**이번 RP에 어떤 로어가 불러와졌는지 채팅 화면에서 바로 확인하는 확장입니다.** 로어를 새로 만들거나 주입 여부를 결정하는 확장이 아닙니다.
+
+[한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd4818892b4c763c1bcc4b5)
+
+## 다운로드
+
+확장 설치 메뉴에 아래 주소를 입력하고 설치한 뒤 새로고침합니다. 기존 WorldInfo Info와 동시에 실행하지 마세요.
+
+```
+https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
+```
+
+## 이런 분들께 추천합니다!
+
+- 캐릭터가 과거 사건이나 설정을 잊었을 때 로어가 실제 활성화되었는지 확인하고 싶은 분
+- 로어를 편집하지 않고 채팅 위에서 원문·저장된 번역문을 읽고 싶은 분
+- 키워드·벡터·Sticky 등 실제 발동 이유와 로어 토큰 합계를 보고 싶은 분
+
+## 사용 설명서
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="주입 목록과 열람창 / Lore list and reader" width="860" /></p>
+
+### 1. 답변을 생성하고 책 버튼 누르기
+
+평소처럼 RP → 떠 있는 책 버튼 → 로어 선택 → 읽고 닫기. 책의 숫자는 추적된 로어 항목 수입니다. 목록은 마지막 일반 RP를 기준으로 갱신되며 토큰 계산용 미리보기나 quiet generation은 덮어쓰지 않습니다. Outlet은 생성 요청에 내용이 들어갔는지 확인합니다. 전체 프롬프트를 토큰 단위로 검사하는 도구는 아닙니다.
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="사용 흐름 / Workflow" width="860" /></p>
+
+### 2. 본문과 발동 이유 읽기
+
+목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다. 벡터 설정이어도 키워드로 발동할 수 있습니다. 키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다.
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="설정과 실제 발동 원인 / Activation cause" width="860" /></p>
+
+로어북 매니저 포크의 유효한 제목·본문 번역을 우선 사용하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다. 유효한 번역이 없으면 원문을 표시합니다. 새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다. 열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다. 창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
+
+### 3. 설정하기
+
+책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다.
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="설정 화면 / Settings" width="860" /></p>
+
+| 설정 | 기본값 / 설명 |
+|---|---|
+| 로어북별로 묶기 | 켜짐. 책별로 표시 |
+| 주입 순서대로 표시 | 켜짐. 끄면 제목순 |
+| 대화 메시지 위치 표시 | 켜짐. 책별 묶기를 끄고 주입 순서를 켰을 때 표시 |
+| 주입 로어 토큰 합계 표시 | 꺼짐. 답변 후 목록을 열 때만 로어 텍스트의 대략적 토큰 계산 |
+| 로어북 서가 연동 | 꺼짐. 로어북 매니저 ambasa.65 이상에서 정확한 항목으로 이동 |
+| 책 버튼 드래그 허용 | 꺼짐. 위치 이동 시만 켜기 |
+| 책 버튼 위치 초기화 | 원래 위치로 복귀 |
+
+로어북 서가 연동에 실패하거나 호환 확장이 없으면 기본 열람창을 엽니다. 번역기나 서재 확장은 필수가 아닙니다.
+
+### 4. 키워드·재귀 보고서
+
+`/wi-report`는 키워드 일치와 재귀 단계·발동 횟수를 확인하는 원본 기능입니다. `/wi-triggered`는 마지막 목록 JSON, `/wi-position-reset`은 책 버튼 위치 초기화입니다.
+
+### Jev 표시 연동은 아직 준비 중입니다
+
+현재 공개 master(v1.7.1-ambasa.3)에는 Jev 출처 표시 연동이 포함되지 않았습니다. 호환되는 STLO 및 월드인포인포 업데이트가 필요합니다. STLO에서 로어를 선택하고 주입하는 기능과 월드인포인포의 출처 표시 기능은 별개입니다.
+
+**안내 기준:** master [84f4e77](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo/commit/84f4e77a0355056d6acda0c69402cd4b2f75a5ca) · 1.7.1-ambasa.3. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 
