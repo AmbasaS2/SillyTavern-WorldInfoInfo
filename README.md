@@ -14,7 +14,7 @@ This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasak
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
-1. Install this fork, not alongside the original, and reload. Generate a normal RP reply and tap the floating book.
+1. Install this fork, not alongside the original, and reload. No separate AI setup is needed. Generate a normal RP reply and tap the floating book.
 2. Select an entry to read its current body and recorded cause. The configured strategy icon and actual activation cause can differ.
 3. Right-click or long-press the book for grouping, order, optional lore-only token total, dragging and library link. Token counting waits until the reply ends and the list is open.
 4. If you use STLO 2.2.4-ambasa.1+ with Jev enabled, confirmed Jev entries show 🔮. If you have the compatible Lorebook Manager (ambasa.65+), optionally turn on the library link; otherwise use the built-in reader.
@@ -187,7 +187,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 **현재 버전: 1.7.1-ambasa.4.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
 
-1. 원본과 동시에 켜지 말고 설치·새로고침 → 일반 RP 답변 생성 → 책 버튼 누르기.
+1. 원본과 동시에 켜지 말고 설치·새로고침  → 별도 AI 설정 없이 일반 RP 답변 생성 → 책 버튼 누르기.
 2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
 3. PC 우클릭·모바일 길게 누르기로 그룹화·정렬·토큰 합계·드래그·서가 연동을 선택합니다. 토큰 계산은 답변 종료 후 목록을 열 때 진행합니다.
 4. STLO 2.2.4-ambasa.1 이상 호환 버전에서 Jev를 사용하면 실제 활성화된 항목에 🔮가 표시됩니다. 로어북 매니저(ambasa.65+)가 있으면 선택적으로 서가 연동을 켜고, 없으면 기본 열람창을 사용합니다.
