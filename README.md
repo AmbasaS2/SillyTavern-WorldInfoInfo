@@ -1,10 +1,10 @@
-# 📚 WorldInfo Info — Ambasa fork
+# 📚 WorldInfo Info
 
 **WorldInfo Info is a SillyTavern extension for inspecting the lorebook entries activated for the current roleplay reply, reading their contents, and checking recorded activation reasons without leaving the chat.**
 
 This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), itself based on [LenAnderson's original WorldInfo Info](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo). The floating book, activation list and keyword/recursion report are the work this fork builds upon. Thank you to both authors for making this workflow possible.
 
-[한국어 안내 ↓](#-월드인포인포--ambasa-포크) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd4818892b4c763c1bcc4b5)
+[한국어 안내 ↓](#-월드인포인포) · [한국어 Notion 사용 설명서](https://app.notion.com/p/422a96b06fd4818892b4c763c1bcc4b5)
 
 **Use this when you want to inspect what lore was activated, not change what is injected.**
 
@@ -36,7 +36,7 @@ The detailed sections below explain optional settings. Compatibility is version-
 ## 📸 UI Preview
 
 <p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Illustrated example of the floating injected lore list and read-only translated lore reader" width="900" /></a>
+  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Illustrated example of the floating book and activated lore list" width="900" /></a>
 </p>
 
 *Illustrated UI examples based on the extension's interface, using fictional lore and sample translations. They are not live screenshots.*
@@ -63,6 +63,9 @@ The number on the book indicates the tracked activated entries. The list can be 
 The list follows the latest visible generation. Dry runs (including token-counting passes) and background quiet generations do not replace it. Ordinary activated entries are shown promptly; outlet entries are included after checking that their text appears in the assembled generation request. This is not a complete token-by-token prompt inspector.
 
 ## 📖 Read-Only Lore Reader
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
+
 
 Select an entry in the list to open a floating reader rather than navigate away to the lorebook editor.
 
@@ -127,7 +130,7 @@ If the manager is absent, disabled, incompatible, or cannot open the entry, the 
 
 ## 🔎 Keyword and Recursion Report
 
-The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches, occurrence counts, and recursion rounds. The Ambasa fork continues to provide this report; activation records are kept compact, and hidden-book filtering is retained for the report and its visible counts.
+The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches, occurrence counts, and recursion rounds. This version continues to provide this report; activation records are kept compact, and hidden-book filtering is retained for the report and its visible counts.
 
 A report with no recorded keyword is not proof that a lore entry was never activated; entries can activate for other reasons.
 
@@ -141,11 +144,11 @@ A report with no recorded keyword is not proof that a lore entry was never activ
 
 The interface follows SillyTavern's language setting. English, Korean, Japanese, Simplified Chinese, Traditional Chinese, Spanish, and French UI strings are included. Interface localization does not translate lorebook contents.
 
-## 🔀 What Changed in the Ambasa Fork?
+## 🔀 What’s new?
 
 Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.4.
 
-| Area | aikohanasaki's fork | Ambasa fork |
+| Area | Original | Current version |
 |---|---|---|
 | Entry selection | Opens the entry in the lorebook editor. | Opens a floating, read-only Markdown reader by default. |
 | Activation information | Existing strategy icons and detailed keyword/recursion report. | Keeps them and adds recorded activation reasons inside the reader. |
@@ -165,7 +168,7 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 
 ---
 
-# 📚 월드인포인포 — Ambasa 포크
+# 📚 월드인포인포
 
 **이번 RP에 어떤 로어가 불러와졌는지 채팅 화면에서 바로 확인하는 확장입니다.** 로어를 새로 만들거나 주입 여부를 결정하는 확장이 아닙니다.
 
@@ -204,7 +207,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## 사용 설명서
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="주입 목록과 열람창 / Lore list and reader" width="860" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="활성 로어 목록 / Activated lore list" width="860" /></p>
 
 ### 1. 답변을 생성하고 책 버튼 누르기
 
@@ -213,6 +216,9 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="사용 흐름 / Workflow" width="860" /></p>
 
 ### 2. 본문과 발동 이유 읽기
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
+
 
 목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다. 벡터 설정이어도 키워드로 발동할 수 있습니다. 키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다.
 
