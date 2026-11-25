@@ -41,6 +41,7 @@
   "worldInfoInfo.reader.reason.keyword": "키워드 일치",
   "worldInfoInfo.reader.reason.vector": "벡터 검색",
   "worldInfoInfo.reader.reason.constant": "상시 주입",
+  "worldInfoInfo.reader.reason.jev": "Jev 기억 호출",
   "worldInfoInfo.reader.reason.sticky": "Sticky 유지",
   "worldInfoInfo.reader.reason.external": "외부 활성화",
   "worldInfoInfo.reader.reason.decorator": "@@activate 지시",

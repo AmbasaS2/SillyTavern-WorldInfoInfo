@@ -56,7 +56,7 @@ The strategy icon in the list represents the configured activation strategy, not
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="Configured strategy vs recorded activation reason / 설정과 발동 이유" width="860" /></p>
 
-### 🔮 Jev Recall via STLO (upcoming)
+### 🔮 Jev Recall via STLO
 
 With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
 
@@ -64,7 +64,7 @@ This works with any supported lorebook enabled for Jev in STLO: memories, charac
 
 WorldInfo Info uses STLO's existing selection and the final World Info activation results. It does not call Jev again, search lorebooks again, change the prompt or bypass token budgets. Entries rejected by STLO or SillyTavern's activation rules are not added for display.
 
-**Release status:** The STLO display integration is implemented and undergoing release verification. It is not included in the current WorldInfo Info public release (v1.7.1-ambasa.3); compatible updates to both forks are required.
+**Compatibility:** WorldInfo Info v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1 or later compatible versions provide this optional display integration. With either older version, ordinary lore display and recall continue independently.
 
 ### 🌐 Read Existing Translations
 
@@ -124,7 +124,7 @@ The interface follows SillyTavern's language setting. English, Korean, Japanese,
 
 ## 🔀 What Changed in the Ambasa Fork?
 
-Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.3.
+Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.4.
 
 | Area | aikohanasaki's fork | Ambasa fork |
 |---|---|---|
@@ -206,11 +206,11 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 `/wi-report`는 키워드 일치와 재귀 단계·발동 횟수를 확인하는 원본 기능입니다. `/wi-triggered`는 마지막 목록 JSON, `/wi-position-reset`은 책 버튼 위치 초기화입니다.
 
-### Jev 표시 연동은 아직 준비 중입니다
+### 🔮 Jev 표시 연동
 
-현재 공개 master(v1.7.1-ambasa.3)에는 Jev 출처 표시 연동이 포함되지 않았습니다. 호환되는 STLO 및 월드인포인포 업데이트가 필요합니다. STLO에서 로어를 선택하고 주입하는 기능과 월드인포인포의 출처 표시 기능은 별개입니다.
+월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제 Jev 발동 항목을 🔮로 표시합니다. 양쪽을 업데이트하면 목록·열람창·기록된 재귀 보고서에서 출처를 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
-**안내 기준:** master [84f4e77](https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo/commit/84f4e77a0355056d6acda0c69402cd4b2f75a5ca) · 1.7.1-ambasa.3. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
+**안내 기준:** 1.7.1-ambasa.4. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 

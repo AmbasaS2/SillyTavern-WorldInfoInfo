@@ -128,5 +128,5 @@ test('viewer-only integration retains legacy and RT fallback; no background poll
     assert.match(index, /linkLoreLibrary === true/);
     assert.doesNotMatch(helper, /MutationObserver|ResizeObserver|setInterval|setTimeout|localStorage|POST|PUT/);
     assert.doesNotMatch(manager, /MutationObserver|ResizeObserver|setInterval|setTimeout/);
-    assert.equal(JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version, '1.7.1-ambasa.2');
+    assert.equal(JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version, '1.7.1-ambasa.4');
 });

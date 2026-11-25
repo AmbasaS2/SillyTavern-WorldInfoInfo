@@ -39,6 +39,7 @@
   "worldInfoInfo.reader.reason.keyword": "关键词匹配",
   "worldInfoInfo.reader.reason.vector": "向量检索",
   "worldInfoInfo.reader.reason.constant": "始终注入",
+  "worldInfoInfo.reader.reason.jev": "Jev 记忆召回",
   "worldInfoInfo.reader.reason.sticky": "Sticky 持续",
   "worldInfoInfo.reader.reason.external": "外部激活",
   "worldInfoInfo.reader.reason.decorator": "@@activate 指令",
