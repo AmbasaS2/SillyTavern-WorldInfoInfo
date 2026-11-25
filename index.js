@@ -1154,6 +1154,7 @@ const init = ()=>{
     let pendingEntries = [];
     let generationSerial = 0;
     let realGenerationInProgress = false;
+    let stopConsoleCapture = null;
     let lastReportBuild = null;
     let lastRenderedGenerationEntries = null;
     let finalizedTokenGeneration = -1;
@@ -1255,6 +1256,7 @@ const init = ()=>{
         if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
         generationSerial++;
         realGenerationInProgress = true;
+        startWorldInfoConsoleCapture();
         stwiiDryRunActive = false;
         tokenGenerationAwaitingEnd = true;
         tokenSummaryRequest++;
@@ -1281,6 +1283,7 @@ const init = ()=>{
     eventSource.on(event_types.CHAT_CHANGED, () => {
         generationSerial++;
         realGenerationInProgress = false;
+        releaseWorldInfoConsoleCapture();
         tokenGenerationAwaitingEnd = false;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
@@ -1334,6 +1337,7 @@ const init = ()=>{
         // Ignore dry runs and repeated/later hooks for an already completed run.
         if (dryRun || !realGenerationInProgress) return;
         realGenerationInProgress = false;
+        releaseWorldInfoConsoleCapture();
         const included = confirmedWiEntries(pendingEntries, data);
         pendingEntries = [];
         // Repaint only if an outlet is confirmed or sticky metadata changed;
@@ -1360,6 +1364,7 @@ const init = ()=>{
     // Wait for the actual reply to finish (not prompt construction). This
     // single event callback only schedules work when the opt-in list is open.
     const onCompletedGeneration = () => {
+        releaseWorldInfoConsoleCapture();
         if (!tokenGenerationAwaitingEnd) return;
         tokenGenerationAwaitingEnd = false;
         syncTokenFooter();
@@ -1367,6 +1372,7 @@ const init = ()=>{
     };
     eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);
     eventSource.on(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
+    eventSource.on(event_types.GENERATION_STOPPED, releaseWorldInfoConsoleCapture);
 
     const updatePanel = (entryList, newChat = false)=>{
         const isGrouped = extension_settings.worldInfoInfo?.group ?? true;
@@ -1945,14 +1951,17 @@ function endBuildSession() {
         }
     }
 
-    //! HACK: no event when no entries are activated, only a debug message
-    (function(){
-        const STWII = (window.STWII ||= {});
-        if (STWII.consolePatched) return;
-        STWII.origDebug = console.debug;
-        STWII.origLog = console.log;
-    const original_debug = console.debug;
-    console.debug = function(...args) {
+    const worldInfoLogSources = [
+        new URL('../../../world-info.js', import.meta.url).href,
+        new URL('../../vectors/index.js', import.meta.url).href,
+    ];
+
+    function releaseWorldInfoConsoleCapture() {
+        stopConsoleCapture?.();
+        stopConsoleCapture = null;
+    }
+
+    function captureDebug(original_debug, ...args) {
         if (!realGenerationInProgress) return original_debug.apply(console, args);
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
@@ -2026,9 +2035,9 @@ function endBuildSession() {
 
         // No UI changes here: zero-entry and dry-run debug logs are not definitive.
         return original_debug.apply(console, args);
-    };
-    const original_log = console.log;
-    console.log = function(...args) {
+    }
+
+    function captureLog(original_log, ...args) {
         if (!realGenerationInProgress) return original_log.apply(console, args);
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
@@ -2121,14 +2130,41 @@ function endBuildSession() {
 
         // No UI changes here: zero-entry and dry-run debug logs are not definitive.
         return original_log.apply(console, args);
-    };
-    STWII.unpatchConsole = function() {
-        try { console.debug = STWII.origDebug; } catch {}
-        try { console.log = STWII.origLog; } catch {}
-        STWII.consolePatched = false;
-    };
-    STWII.consolePatched = true;
-})();
+    }
+
+    function startWorldInfoConsoleCapture() {
+        releaseWorldInfoConsoleCapture();
+        // Exact activation reasons are only available in the engine's diagnostics.
+        // Return the original function at every unrelated call site so DevTools
+        // records the caller itself, rather than a forwarding wrapper.
+        const restore = [];
+        for (const [method, collect] of [['debug', captureDebug], ['log', captureLog]]) {
+            const descriptor = Object.getOwnPropertyDescriptor(console, method);
+            if (!descriptor?.configurable || !descriptor.writable || typeof descriptor.value !== 'function') continue;
+            const capture = (...args) => collect(descriptor.value, ...args);
+            const getWorldInfoConsoleMethod = function getWorldInfoConsoleMethod() {
+                const frames = (new Error().stack ?? '').split('\n', 4);
+                const callerIndex = frames.findIndex(frame => frame.includes('getWorldInfoConsoleMethod')) + 1;
+                const caller = callerIndex > 0 ? frames[callerIndex] ?? '' : '';
+                return worldInfoLogSources.some(source => caller.includes(source + ':') || caller.includes(source + '?'))
+                    ? capture : descriptor.value;
+            };
+            Object.defineProperty(console, method, {
+                configurable: true,
+                enumerable: descriptor.enumerable,
+                get: getWorldInfoConsoleMethod,
+                set(value) {
+                    Object.defineProperty(console, method, { ...descriptor, value });
+                },
+            });
+            restore.push(() => {
+                if (Object.getOwnPropertyDescriptor(console, method)?.get === getWorldInfoConsoleMethod) {
+                    Object.defineProperty(console, method, descriptor);
+                }
+            });
+        }
+        stopConsoleCapture = () => restore.forEach(release => release());
+    }
 
 // Optional teardown to remove UI and unpatch console
 window.STWII.destroy = function() {
@@ -2138,10 +2174,12 @@ window.STWII.destroy = function() {
     try {
         eventSource.removeListener?.(event_types.GENERATION_ENDED, onCompletedGeneration);
         eventSource.removeListener?.(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
+        eventSource.removeListener?.(event_types.GENERATION_STOPPED, releaseWorldInfoConsoleCapture);
+        eventSource.removeListener?.(event_types.GENERATION_STARTED, beginRealGeneration);
     } catch {}
     linkedLoreClickSerial++;
     closeLoreViewer();
-    try { window.STWII.unpatchConsole?.(); } catch {}
+    releaseWorldInfoConsoleCapture();
     try {
         const t = window.STWII.trigger;
         if (t && t.parentNode) t.parentNode.removeChild(t);
