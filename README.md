@@ -29,9 +29,11 @@ The detailed sections below explain optional settings. Compatibility is version-
 
 ## Who is this for?
 
-- Players who want to understand why their character forgot a fact or recalled an unexpected entry.
-- Players who want to read previously saved lore translations without opening the editor or paying for another translation.
-- Players who want a quick lore-only token estimate or an optional shortcut to the Lorebook Manager library.
+- See which lorebooks and entries actually activated for the latest visible reply.
+- Find out why a lore entry activated: matched primary/secondary keywords, constant injection, confirmed vector retrieval, Sticky continuation, external activation or @@activate.
+- Troubleshoot unexpected or missing lore using the keyword-frequency and recursion-round report, Sticky counts and injection order.
+- Read formatted lore or saved translations in the chat without opening the editor or paying for another translation.
+- Check an approximate activated-lore token total, identify actual Jev activations with compatible STLO, or open the exact entry in the optional Lorebook Manager library.
 
 ## 📸 UI Preview
 
@@ -70,7 +72,7 @@ The list follows the latest visible generation. Dry runs (including token-counti
 Select an entry in the list to open a floating reader rather than navigate away to the lorebook editor.
 
 - Read the title and body as formatted Markdown with the active SillyTavern theme and chat typography.
-- See recorded causes such as a keyword match, secondary keyword condition, always-active injection, confirmed vector search, sticky continuation, external activation, or an `@@activate` directive. If the cause cannot be established, the reader says so.
+- See recorded causes such as a keyword match, secondary keyword condition, always-active injection, confirmed vector search, sticky continuation, external activation, or an `@@activate` directive. If the cause cannot be established, the reader says so. Recorded primary and secondary keyword values can be displayed, as can applicable negative keyword logic. Multiple confirmed causes may be shown together. The list shows a pin and remaining rounds for active Sticky entries.
 - Drag the reader by its header; desktop and mobile reader positions are remembered separately.
 - The reader loads the current lorebook entry when opened. It does not edit the lorebook or reconstruct an exact historical copy of the request.
 
@@ -132,7 +134,7 @@ If the manager is absent, disabled, incompatible, or cannot open the entry, the 
 
 The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches, occurrence counts, and recursion rounds. This version continues to provide this report; activation records are kept compact, and hidden-book filtering is retained for the report and its visible counts.
 
-A report with no recorded keyword is not proof that a lore entry was never activated; entries can activate for other reasons.
+A report with no recorded keyword is not proof that a lore entry was never activated; entries can activate for other reasons. The report lists keyword counts and associated entries, with a per-recursion-round breakdown. Jev is a recall source, not a keyword hit. Hidden-lorebook rules are respected for non-admin users and visible report counts.
 
 | Command | Function |
 |---|---|
@@ -201,9 +203,11 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## 이런 분들께 추천합니다!
 
-- 캐릭터가 과거 사건이나 설정을 잊었을 때 로어가 실제 활성화되었는지 확인하고 싶은 분
-- 로어를 편집하지 않고 채팅 위에서 원문·저장된 번역문을 읽고 싶은 분
-- 키워드·벡터·Sticky 등 실제 발동 이유와 로어 토큰 합계를 보고 싶은 분
+- 이번 답변에 어느 로어북의 어떤 항목이 실제 활성화되었는지 확인하고 싶은 분
+- 기본·보조 키워드 일치, 상시 주입, 벡터 검색, Sticky 유지, 외부 활성화, @@activate 등 기록된 실제 발동 이유를 알고 싶은 분
+- 키워드 일치 횟수·재귀 단계·Sticky 남은 횟수·주입 위치와 순서로 예상 밖의 발동 원인을 추적하고 싶은 분
+- 채팅을 벗어나지 않고 마크다운 본문과 이미 저장한 번역을 읽고 싶은 분
+- 활성 로어의 토큰 합계를 확인하거나, 호환 STLO의 Jev 출처를 구분하고, 로어북 매니저에서 해당 항목을 바로 열고 싶은 분
 
 ## 사용 설명서
 
@@ -226,6 +230,8 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 로어북 매니저 포크의 유효한 제목·본문 번역을 우선 사용하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다. 유효한 번역이 없으면 원문을 표시합니다. 새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다. 열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다. 창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
 
+**기록된 발동 이유의 세부 정보:** 일치한 기본·보조 키워드 값과 부정 조건 논리, 확인된 벡터 검색 여부, 여러 원인을 함께 표시할 수 있습니다. 목록의 📌 숫자는 Sticky의 남은 유지 횟수입니다. 원인이 확인되지 않으면 확인 불가로 표시합니다.
+
 ### 3. 설정하기
 
 책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다.
@@ -247,6 +253,8 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 ### 4. 키워드·재귀 보고서
 
 `/wi-report`는 키워드 일치와 재귀 단계·발동 횟수를 확인하는 원본 기능입니다. `/wi-triggered`는 마지막 목록 JSON, `/wi-position-reset`은 책 버튼 위치 초기화입니다.
+
+**보고서 상세:** 키워드별 일치 횟수와 관련 항목, 재귀 단계별 발동 수를 확인합니다. Jev는 키워드 빈도에 포함되지 않으며 숨김 로어북과 비관리자 표시 규칙을 보고서에도 적용합니다.
 
 ### 🔮 Jev 표시 연동
 
