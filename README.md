@@ -8,6 +8,25 @@ This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasak
 
 **Use this when you want to inspect what lore was activated, not change what is injected.**
 
+## Start here — WorldInfo Info in five minutes
+
+**Current version: 1.7.1-ambasa.4.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+
+<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
+
+1. Install this fork, not alongside the original, and reload. Generate a normal RP reply and tap the floating book.
+2. Select an entry to read its current body and recorded cause. The configured strategy icon and actual activation cause can differ.
+3. Right-click or long-press the book for grouping, order, optional lore-only token total, dragging and library link. Token counting waits until the reply ends and the list is open.
+4. If you use STLO 2.2.4-ambasa.1+ with Jev enabled, confirmed Jev entries show 🔮. If you have the compatible Lorebook Manager (ambasa.65+), optionally turn on the library link; otherwise use the built-in reader.
+
+### Works alone, better together
+
+Compatible STLO marks actual Jev activation without a second request. Compatible Lorebook Manager reads saved translations and optionally opens the exact entry by book name and UID. Memory Books is not required to inspect Jev or any other lore.
+
+[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [Four-extension workflow guide (Korean, bilingual diagrams)](https://app.notion.com/p/423a96b06fd48147be13ec0929ee088d)
+
+The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
+
 ## Who is this for?
 
 - Players who want to understand why their character forgot a fact or recalled an unexpected entry.
@@ -159,6 +178,23 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 ```
 https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 ```
+
+## 먼저 읽어 보세요 · 처음 사용하는 분을 위한 5분 안내
+
+**현재 버전: 1.7.1-ambasa.4.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
+
+1. 원본과 동시에 켜지 말고 설치·새로고침 → 일반 RP 답변 생성 → 책 버튼 누르기.
+2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
+3. PC 우클릭·모바일 길게 누르기로 그룹화·정렬·토큰 합계·드래그·서가 연동을 선택합니다. 토큰 계산은 답변 종료 후 목록을 열 때 진행합니다.
+4. STLO 2.2.4-ambasa.1 이상 호환 버전에서 Jev를 사용하면 실제 활성화된 항목에 🔮가 표시됩니다. 로어북 매니저(ambasa.65+)가 있으면 선택적으로 서가 연동을 켜고, 없으면 기본 열람창을 사용합니다.
+
+### 단독으로도 충분하고, 함께 쓰면 더 편리합니다
+
+호환 STLO의 실제 Jev 결과를 추가 요청 없이 표시합니다. 호환 로어북 매니저의 저장 번역을 읽거나 책 이름과 UID로 정확한 서재 항목을 엽니다. 메모리북은 Jev 표시나 일반 로어 확인에 필수가 아닙니다.
+
+[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks) · [4개 확장 연동 사용설명서](https://app.notion.com/p/423a96b06fd48147be13ec0929ee088d)
+
+아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
 ## 이런 분들께 추천합니다!
 
