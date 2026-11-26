@@ -28,6 +28,8 @@ const WI_UI_EN = {
     "settings.messages.hint": "Show the chat messages between injected lore entries when grouping is off and injection order is on.",
     "settings.tokens.label": "Show injected lore token total",
     "settings.tokens.hint": "Optional estimate when you open the list. No token counting during generation.",
+    "settings.original.label": "View original text",
+    "settings.original.hint": "Show original lore titles and text in WorldInfo Info instead of saved translations. Does not change the Lorebook Library.",
     "settings.library.label": "Link Lorebook Library",
     "settings.library.hint": "When available, open the clicked injected lore in the independent Lorebook Library. Otherwise use the existing reader.",
     "panel.tokens.label": "Injected lore total",
@@ -208,15 +210,21 @@ const getStrategy = (entry)=>{
 
 // Preserve the legacy in-memory translations for older Lorebook Manager
 // versions. Newer versions use per-book files, read on viewer open only.
+function showOriginalLore() {
+    return extension_settings.worldInfoInfo?.showOriginalLore === true;
+}
+
 function displayWiTitle(entry, snapshot = null) {
     const source = String(entry?.comment ?? '');
     const original = source.trim()
         || (Array.isArray(entry?.key) ? entry.key : entry?.keys ?? []).join(', ');
+    if (showOriginalLore()) return original;
     return managerTranslatedTitle(entry, snapshot, extension_settings['simple-lorebook']) || original;
 }
 
 function displayWiBody(entry, snapshot = null) {
     const source = String(entry?.content ?? '');
+    if (showOriginalLore()) return source;
     return managerTranslatedBody(entry, snapshot, extension_settings['simple-lorebook']) ?? source;
 }
 
@@ -609,7 +617,8 @@ async function showLoreViewer(entry) {
         // One on-demand, read-only request for this book's current translation
         // snapshot; start beside the existing WorldInfo read, never at startup,
         // while scanning prompts, or when rendering the injected-entry list.
-        const hasManager = Boolean(extension_settings['simple-lorebook'] || window.__slbLoreManagerActive);
+        const originalOnly = showOriginalLore();
+        const hasManager = !originalOnly && Boolean(extension_settings['simple-lorebook'] || window.__slbLoreManagerActive);
         const [data, translationFile] = await Promise.all([
             loadWorldInfo(entry.world),
             hasManager
@@ -627,7 +636,7 @@ async function showLoreViewer(entry) {
         renderLorePreview(body,managerText);
         // Prefer an existing, current Lorebook Manager translation. RT supplies
         // the body only when the manager has no usable translated body.
-        if (managerText === source) {
+        if (!originalOnly && managerText === source) {
             const rtText = await rtTranslatedBody(full);
             if (currentLoreViewer?.overlay !== overlay) return;
             if (typeof rtText === 'string') renderLorePreview(body,rtText);
@@ -816,6 +825,25 @@ const init = ()=>{
             lbl.textContent = wiT('settings.tokens.label');
             tokenRow.append(cb, lbl);
             configPanel.append(tokenRow);
+        }
+        // Display preference only. Reuse the existing list, never rescan lore.
+        const originalRow = document.createElement('label'); {
+            originalRow.classList.add('stwii--configRow');
+            originalRow.title = wiT('settings.original.hint');
+            const cb = document.createElement('input');
+            cb.type = 'checkbox';
+            cb.checked = showOriginalLore();
+            cb.addEventListener('change', () => {
+                if (!extension_settings.worldInfoInfo) extension_settings.worldInfoInfo = {};
+                extension_settings.worldInfoInfo.showOriginalLore = cb.checked;
+                if (currentEntryList.length) updatePanel(currentEntryList);
+                saveSettingsDebounced();
+                requestAnimationFrame(ensurePanelsVisible);
+            });
+            const lbl = document.createElement('div');
+            lbl.textContent = wiT('settings.original.label');
+            originalRow.append(cb, lbl);
+            configPanel.append(originalRow);
         }
         // Optional bridge to Lorebook Manager's standalone library. Disabled
         // unless explicitly selected; never starts a manager or AI task.

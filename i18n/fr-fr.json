@@ -8,6 +8,8 @@
   "worldInfoInfo.settings.messages.hint": "Affiche les messages entre les entrées si le regroupement est désactivé et que l’ordre d’insertion est activé.",
   "worldInfoInfo.settings.tokens.label": "Afficher le total des tokens du lore inséré",
   "worldInfoInfo.settings.tokens.hint": "Estimation seulement à l'ouverture de la liste, jamais pendant la génération.",
+  "worldInfoInfo.settings.original.label": "Afficher le texte original",
+  "worldInfoInfo.settings.original.hint": "Affiche les titres et le texte d’origine dans la liste et le lecteur intégré de WorldInfo Info plutôt que les traductions enregistrées. Sans effet sur la bibliothèque indépendante.",
   "worldInfoInfo.panel.tokens.label": "Total du lore inséré",
   "worldInfoInfo.panel.tokens.value": "Environ {0} tokens",
   "worldInfoInfo.panel.tokens.calculating": "Calcul en cours…",

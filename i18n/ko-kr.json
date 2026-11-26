@@ -10,6 +10,8 @@
   "worldInfoInfo.settings.tokens.hint": "켜면 목록을 열었을 때만 주입된 로어의 토큰 수를 대략 계산합니다. 답변 생성 중에는 계산하지 않습니다.",
   "worldInfoInfo.settings.library.label": "로어북 서가 연동",
   "worldInfoInfo.settings.library.hint": "켜면 주입된 로어를 클릭할 때 로어북 매니저의 독립 서재에서 해당 기록을 엽니다. 이용할 수 없으면 기존 열람창을 엽니다.",
+  "worldInfoInfo.settings.original.label": "원문으로 보기",
+  "worldInfoInfo.settings.original.hint": "월드인포인포 목록과 기본 열람창에서 저장 번역문 대신 원문 제목과 본문을 표시합니다. 로어북 서가에는 적용되지 않습니다.",
   "worldInfoInfo.panel.tokens.label": "주입 로어 총합",
   "worldInfoInfo.panel.tokens.value": "약 {0} 토큰",
   "worldInfoInfo.panel.tokens.calculating": "계산 중…",

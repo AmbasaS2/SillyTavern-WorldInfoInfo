@@ -124,9 +124,9 @@ test('viewer-only integration retains legacy and RT fallback; no background poll
     assert.match(index, /hasManager[\s\S]*readManagerTranslationBook\(entry\.world/);
     assert.match(index, /displayWiTitle\(full, translationFile\)/);
     assert.match(index, /displayWiBody\(full, translationFile\)/);
-    assert.match(index, /if \(managerText === source\) \{[\s\S]*rtTranslatedBody\(full\)/);
+    assert.match(index, /if \(!originalOnly && managerText === source\) \{[\s\S]*rtTranslatedBody\(full\)/);
     assert.match(index, /linkLoreLibrary === true/);
     assert.doesNotMatch(helper, /MutationObserver|ResizeObserver|setInterval|setTimeout|localStorage|POST|PUT/);
     assert.doesNotMatch(manager, /MutationObserver|ResizeObserver|setInterval|setTimeout/);
-    assert.equal(JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version, '1.7.1-ambasa.4');
+    assert.equal(JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version, '1.7.1-ambasa.5');
 });

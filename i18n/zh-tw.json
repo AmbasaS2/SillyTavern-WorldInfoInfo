@@ -8,6 +8,8 @@
   "worldInfoInfo.settings.messages.hint": "關閉分組並啟用注入順序後，同時顯示世界書條目間的聊天訊息位置。",
   "worldInfoInfo.settings.tokens.label": "顯示已注入世界書的 Token 總數",
   "worldInfoInfo.settings.tokens.hint": "只在開啟清單時估算，回覆生成時不計算。",
+  "worldInfoInfo.settings.original.label": "查看原文",
+  "worldInfoInfo.settings.original.hint": "在 WorldInfo Info 的清單和內建閱讀器中顯示原標題和正文，而非已儲存的譯文。不影響獨立的世界書庫。",
   "worldInfoInfo.panel.tokens.label": "已注入世界書總量",
   "worldInfoInfo.panel.tokens.value": "約 {0} Token",
   "worldInfoInfo.panel.tokens.calculating": "計算中…",

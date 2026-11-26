@@ -10,7 +10,7 @@ This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasak
 
 ## Start here — WorldInfo Info in five minutes
 
-**Current version: 1.7.1-ambasa.4.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+**Current version: 1.7.1-ambasa.5.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
@@ -92,9 +92,9 @@ WorldInfo Info uses STLO's existing selection and the final World Info activatio
 
 ### 🌐 Read Existing Translations
 
-If compatible saved translations exist, the reader can display them without translating the entry again.
+If compatible saved translations exist, the built-in reader displays them by default without translating the entry again. Enable **View original text** in the book button settings to display original titles and bodies instead; turn it off to return to saved translations. This also applies to titles in the WorldInfo Info list. The independent Lorebook Library keeps its own display settings.
 
-- **Ambasa's Lorebook Manager:** reads the current per-lorebook translation JSON when the reader opens; valid translated titles and bodies are supported, as are compatible legacy saved translations.
+- **Lorebook Manager (original and fork):** reads the fork's current per-lorebook translation JSON when the reader opens, and compatible settings-based translations from the original or older fork versions. Valid translated titles and bodies are supported.
 - **Cherry&Solti's lorebook translator (RT):** uses a valid saved body translation when no usable Manager body translation is available.
 - **No usable translation:** displays the original text. Missing, stale, or unavailable translations do not block reading.
 
@@ -105,7 +105,7 @@ This is a read-only integration, not a translation engine. It does not start AI 
 Right-click the floating book on desktop or long-press it on mobile.
 
 <p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="Illustrated settings guide, including optional token total and Lorebook Library integration" width="860" /></a>
+  <a href="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="Settings menu including original text, optional token total and Lorebook Library integration" width="860" /></a>
 </p>
 
 | Setting | What it does | Default |
@@ -114,6 +114,7 @@ Right-click the floating book on desktop or long-press it on mobile.
 | **Show in injection order** | Orders entries by insertion position and order rather than title. | On |
 | **Show chat message positions** | With grouping off and injection ordering on, shows intervening chat message positions. | On |
 | **Show injected lore token total** | Shows an approximate total of the injected lore text after generation has finished and the list is opened. | Off |
+| **View original text** | Shows original titles in the list and original titles and bodies in the built-in reader; skips saved-translation lookup. | Off |
 | **Link Lorebook Library** | Opens the exact entry in the optional Lorebook Manager Library instead of the built-in reader when available. | Off |
 | **Allow dragging the book button** | Lets you move the floating book. | Off |
 | **Reset book button position** | Returns the floating book to its original position. | Action |
@@ -126,7 +127,7 @@ No token-counting work is started during generation or streaming. The total is n
 
 ### 📚 Optional Lorebook Library Integration
 
-Enable **Link Lorebook Library** to open an entry in the independent floating library provided by [Ambasa's Lorebook Manager](https://github.com/AmbasaS2/lore-manager) v1.4.85-ambasa.65 or later. Matching uses the lorebook name and entry UID, not its displayed or translated title.
+Enable **Link Lorebook Library** to open an entry in the independent floating library provided by [Lorebook Manager fork](https://github.com/AmbasaS2/lore-manager) v1.4.85-ambasa.65 or later. Matching uses the lorebook name and entry UID, not its displayed or translated title.
 
 If the manager is absent, disabled, incompatible, or cannot open the entry, the built-in read-only reader opens instead. Leave this option off if you prefer the quick viewer and activation explanation. The setting changes navigation only, not lorebook contents, translation data, or prompt injection.
 
@@ -148,7 +149,7 @@ The interface follows SillyTavern's language setting. English, Korean, Japanese,
 
 ## 🔀 What’s new?
 
-Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.4.
+Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.5.
 
 | Area | Original | Current version |
 |---|---|---|
@@ -185,7 +186,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## 먼저 읽어 보세요 · 처음 사용하는 분을 위한 5분 안내
 
-**현재 버전: 1.7.1-ambasa.4.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
+**현재 버전: 1.7.1-ambasa.5.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
 
 1. 원본과 동시에 켜지 말고 설치·새로고침  → 별도 AI 설정 없이 일반 RP 답변 생성 → 책 버튼 누르기.
 2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
@@ -227,7 +228,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="설정과 실제 발동 원인 / Activation cause" width="860" /></p>
 
-로어북 매니저 포크의 유효한 제목·본문 번역을 우선 사용하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다. 유효한 번역이 없으면 원문을 표시합니다. 새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다. 열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다. 창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
+기본 열람창에서는 로어북 매니저 원본·포크의 유효한 제목·본문 번역을 우선 표시하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다. 유효한 번역이 없으면 원문을 표시합니다. 책 버튼 설정에서 **원문으로 보기**를 켜면 목록 제목과 기본 열람창의 제목·본문을 원문으로 표시하고, 끄면 다시 저장 번역을 우선 표시합니다. 독립 로어북 서가는 자체 표시 설정을 따릅니다. 새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다. 열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다. 창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
 
 **기록된 발동 이유의 세부 정보:** 일치한 기본·보조 키워드 값과 부정 조건 논리, 확인된 벡터 검색 여부, 여러 원인을 함께 표시할 수 있습니다. 목록의 📌 숫자는 Sticky의 남은 유지 횟수입니다. 원인이 확인되지 않으면 확인 불가로 표시합니다.
 
@@ -243,7 +244,8 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 | 주입 순서대로 표시 | 켜짐. 끄면 제목순 |
 | 대화 메시지 위치 표시 | 켜짐. 책별 묶기를 끄고 주입 순서를 켰을 때 표시 |
 | 주입 로어 토큰 합계 표시 | 꺼짐. 답변 후 목록을 열 때만 로어 텍스트의 대략적 토큰 계산 |
-| 로어북 서가 연동 | 꺼짐. 로어북 매니저 ambasa.65 이상에서 정확한 항목으로 이동 |
+| 원문으로 보기 (View original text) | 꺼짐. 목록 제목과 기본 열람창 제목·본문을 원문으로 표시하며 번역 조회를 생략 |
+| 로어북 서가 연동 | 꺼짐. 로어북 매니저 호환 포크에서 정확한 항목으로 이동 |
 | 책 버튼 드래그 허용 | 꺼짐. 위치 이동 시만 켜기 |
 | 책 버튼 위치 초기화 | 원래 위치로 복귀 |
 
@@ -259,12 +261,12 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제 Jev 발동 항목을 🔮로 표시합니다. 양쪽을 업데이트하면 목록·열람창·기록된 재귀 보고서에서 출처를 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
-**안내 기준:** 1.7.1-ambasa.4. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
+**안내 기준:** 1.7.1-ambasa.5. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 
 - **Original extension:** [LenAnderson/SillyTavern-WorldInfoInfo](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo)
 - **Direct upstream fork:** [aikohanasaki/SillyTavern-WorldInfoInfo](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo) — including the floating button movement, click-to-open navigation, and `/wi-report`.
-- **This fork:** AmbasaS2 — reading-oriented additions and optional integrations.
+- **This fork:** reading-oriented additions and optional integrations.
 
 This project retains the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE).

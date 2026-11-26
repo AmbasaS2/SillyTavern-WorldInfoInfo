@@ -8,6 +8,8 @@
   "worldInfoInfo.settings.messages.hint": "ロアブック別のグループ表示をオフ、挿入順をオンにすると、ロアの間にあるチャットの位置も表示します。",
   "worldInfoInfo.settings.tokens.label": "挿入ロアのトークン合計を表示",
   "worldInfoInfo.settings.tokens.hint": "有効時のみ、一覧を開いた後に概算します。生成中は計算しません。",
+  "worldInfoInfo.settings.original.label": "原文で表示",
+  "worldInfoInfo.settings.original.hint": "WorldInfo Infoの一覧と標準閲覧画面で保存済み翻訳の代わりに原文のタイトルと本文を表示します。ロアブックライブラリには適用されません。",
   "worldInfoInfo.panel.tokens.label": "挿入ロア合計",
   "worldInfoInfo.panel.tokens.value": "約{0}トークン",
   "worldInfoInfo.panel.tokens.calculating": "計算中…",
