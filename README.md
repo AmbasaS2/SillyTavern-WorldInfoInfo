@@ -8,41 +8,6 @@ This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasak
 
 **Use this when you want to inspect what lore was activated, not change what is injected.**
 
-## Start here — WorldInfo Info in five minutes
-
-**Current version: 1.7.1-ambasa.7.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
-
-<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
-
-1. Install this fork, not alongside the original, and reload. No separate AI setup is needed. Generate a normal RP reply and tap the floating book.
-2. Select an entry to read its current body and recorded cause. The configured strategy icon and actual activation cause can differ.
-3. Right-click or long-press the book for grouping, order, optional lore-only token total, dragging and library link. Token counting waits until the reply ends and the list is open.
-4. If you use STLO 2.2.4-ambasa.1+ with Jev enabled, confirmed Jev entries show 🔮. If you have the compatible Lorebook Manager (ambasa.65+), optionally turn on the library link; otherwise use the built-in reader.
-
-### Works alone, better together
-
-Compatible STLO marks actual Jev activation without a second request. Compatible Lorebook Manager reads saved translations and optionally opens the exact entry by book name and UID. Memory Books is not required to inspect Jev or any other lore.
-
-[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
-
-The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
-
-## Who is this for?
-
-- See which lorebooks and entries actually activated for the latest visible reply.
-- Find out why a lore entry activated: matched primary/secondary keywords, constant injection, confirmed vector retrieval, Sticky continuation, external activation or @@activate.
-- Troubleshoot unexpected or missing lore using the keyword-frequency and recursion-round report, Sticky counts and injection order.
-- Read formatted lore or saved translations in the chat without opening the editor or paying for another translation.
-- Check an approximate activated-lore token total, identify actual Jev activations with compatible STLO, or open the exact entry in the optional Lorebook Manager library.
-
-## 📸 UI Preview
-
-<p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Illustrated example of the floating book and activated lore list" width="900" /></a>
-</p>
-
-*Illustrated UI examples based on the extension's interface, using fictional lore and sample translations. They are not live screenshots.*
-
 ## 📥 Installation and First Steps
 
 1. In SillyTavern, open **Extensions → Install extension** (sometimes under extension management).
@@ -52,11 +17,42 @@ The detailed sections below explain optional settings. Compatibility is version-
 
 Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core list, reader, and report work independently.
 
-## 🧭 How It Works
+## Who is this for?
+
+- See which lorebooks and entries actually activated for the latest visible reply.
+- Find out why a lore entry activated: matched primary/secondary keywords, constant injection, confirmed vector retrieval, Sticky continuation, external activation or @@activate.
+- Troubleshoot unexpected or missing lore using the keyword-frequency and recursion-round report, Sticky counts and injection order.
+- Read formatted lore or saved translations in the chat without opening the editor or paying for another translation.
+- Check an approximate activated-lore token total, identify actual Jev activations with compatible STLO, or open the exact entry in the optional Lorebook Manager library.
+
+## ⚡ Quick start
+
+**Current version: 1.7.1-ambasa.7.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+
+<details>
+<summary>View the illustrated workflow</summary>
+
+<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
+
+</details>
+
+1. Install this fork, not alongside the original, and reload. No separate AI setup is needed. Generate a normal RP reply and tap the floating book.
+2. Select an entry to read its current body and recorded cause. The configured strategy icon and actual activation cause can differ.
+3. Right-click or long-press the book for grouping, order, optional lore-only token total, dragging and library link. Token counting waits until the reply ends and the list is open.
+4. If you use STLO 2.2.4-ambasa.1+ with Jev enabled, confirmed Jev entries show 🔮. If you have the compatible Lorebook Manager (ambasa.65+), optionally turn on the library link; otherwise use the built-in reader.
+
+## 📖 How to use
+
+### 1. Generate a reply and open the book
+
+<details>
+<summary>View the illustrated workflow</summary>
 
 <p align="center">
   <a href="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="Generate a reply, open the book, select a lore entry and read an available saved translation" width="860" /></a>
 </p>
+
+</details>
 
 **Generate a reply → open the floating book → select an entry → read its contents and recorded activation cause.**
 
@@ -64,7 +60,13 @@ The number on the book indicates the tracked activated entries. The list can be 
 
 The list follows the latest visible generation. Dry runs (including token-counting passes) and background quiet generations do not replace it. Ordinary activated entries are shown promptly; outlet entries are included after checking that their text appears in the assembled generation request. This is not a complete token-by-token prompt inspector.
 
-## 📖 Read-Only Lore Reader
+<p align="center">
+  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Illustrated example of the floating book and activated lore list" width="900" /></a>
+</p>
+
+*Illustrated UI examples based on the extension's interface, using fictional lore and sample translations. They are not live screenshots.*
+
+### 2. Select a lore entry to read it
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
 
@@ -80,16 +82,6 @@ The strategy icon in the list represents the configured activation strategy, not
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="Configured strategy vs recorded activation reason / 설정과 발동 이유" width="860" /></p>
 
-### 🔮 Jev Recall via STLO
-
-With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
-
-This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
-
-WorldInfo Info uses STLO's existing selection and the final World Info activation results. It does not call Jev again, search lorebooks again, change the prompt or bypass token budgets. Entries rejected by STLO or SillyTavern's activation rules are not added for display.
-
-**Compatibility:** WorldInfo Info v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1 or later compatible versions provide this optional display integration. With either older version, ordinary lore display and recall continue independently.
-
 ### 🌐 Read Existing Translations
 
 If compatible saved translations exist, the built-in reader displays them by default without translating the entry again. Enable **View original text** in the book button settings to display original titles and bodies instead; turn it off to return to saved translations. This also applies to titles in the WorldInfo Info list. The independent Lorebook Library keeps its own display settings.
@@ -100,7 +92,7 @@ If compatible saved translations exist, the built-in reader displays them by def
 
 This is a read-only integration, not a translation engine. It does not start AI translation, change saved translations, or substitute translated text into the roleplay prompt. Per-book file lookup takes place on reader open, not during generation or list display.
 
-## ⚙️ Settings
+### 3. Optional book-button settings
 
 Right-click the floating book on desktop or long-press it on mobile.
 
@@ -152,7 +144,7 @@ Enable **Link Lorebook Library** to open an entry in the independent floating li
 
 If the manager is absent, disabled, incompatible, or cannot open the entry, the built-in read-only reader opens instead. Leave this option off if you prefer the quick viewer and activation explanation. The setting changes navigation only, not lorebook contents, translation data, or prompt injection.
 
-## 🔎 Keyword and Recursion Report
+### 4. Keyword and Recursion Report
 
 The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches, occurrence counts, and recursion rounds. This version continues to provide this report; activation records are kept compact, and hidden-book filtering is retained for the report and its visible counts.
 
@@ -213,12 +205,29 @@ The extension observes existing generation events rather than performing a secon
 
 WorldInfo Info does not decide what lore should be activated or injected. The core activation rules, probability, budget, recursion, and prompt assembly remain SillyTavern's responsibility.
 
+## 🧩 Works well with
+
+Compatible STLO marks actual Jev activation without a second request. Compatible Lorebook Manager reads saved translations and optionally opens the exact entry by book name and UID. Memory Books is not required to inspect Jev or any other lore.
+
+[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+
+The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
+
+### 🔮 Jev Recall via STLO
+
+With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
+
+This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
+
+WorldInfo Info uses STLO's existing selection and the final World Info activation results. It does not call Jev again, search lorebooks again, change the prompt or bypass token budgets. Entries rejected by STLO or SillyTavern's activation rules are not added for display.
+
+**Compatibility:** WorldInfo Info v1.7.1-ambasa.4 and STLO v2.2.4-ambasa.1 or later compatible versions provide this optional display integration. With either older version, ordinary lore display and recall continue independently.
+
 ---
 
 # 📚 월드인포인포
 
 **이번 RP에 어떤 로어가 불러와졌는지 채팅 화면에서 바로 확인하는 확장입니다.** 로어를 새로 만들거나 주입 여부를 결정하는 확장이 아닙니다.
-
 
 ## 다운로드
 
@@ -228,7 +237,15 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 ```
 
-## 먼저 읽어 보세요 · 처음 사용하는 분을 위한 5분 안내
+## 💗 이 확장 누가 쓰지?
+
+- 이번 답변에 어느 로어북의 어떤 항목이 실제 활성화되었는지 확인하고 싶은 분
+- 기본·보조 키워드 일치, 상시 주입, 벡터 검색, Sticky 유지, 외부 활성화, @@activate 등 기록된 실제 발동 이유를 알고 싶은 분
+- 키워드 일치 횟수·재귀 단계·Sticky 남은 횟수·주입 위치와 순서로 예상 밖의 발동 원인을 추적하고 싶은 분
+- 채팅을 벗어나지 않고 마크다운 본문과 이미 저장한 번역을 읽고 싶은 분
+- 활성 로어의 토큰 합계를 확인하거나, 호환 STLO의 Jev 출처를 구분하고, 로어북 매니저에서 해당 항목을 바로 열고 싶은 분
+
+## ⚡ 간단 사용 설명
 
 **현재 버전: 1.7.1-ambasa.7.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
 
@@ -237,42 +254,46 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 3. PC 우클릭·모바일 길게 누르기로 그룹화·정렬·토큰 합계·드래그·서가 연동을 선택합니다. 토큰 계산은 답변 종료 후 목록을 열 때 진행합니다.
 4. STLO 2.2.4-ambasa.1 이상 호환 버전에서 Jev를 사용하면 실제 활성화된 항목에 🔮가 표시됩니다. 로어북 매니저(ambasa.65+)가 있으면 선택적으로 서가 연동을 켜고, 없으면 기본 열람창을 사용합니다.
 
-### 단독으로도 충분하고, 함께 쓰면 더 편리합니다
-
-호환 STLO의 실제 Jev 결과를 추가 요청 없이 표시합니다. 호환 로어북 매니저의 저장 번역을 읽거나 책 이름과 UID로 정확한 서재 항목을 엽니다. 메모리북은 Jev 표시나 일반 로어 확인에 필수가 아닙니다.
-
-[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
-
-아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
-
-## 이런 분들께 추천합니다!
-
-- 이번 답변에 어느 로어북의 어떤 항목이 실제 활성화되었는지 확인하고 싶은 분
-- 기본·보조 키워드 일치, 상시 주입, 벡터 검색, Sticky 유지, 외부 활성화, @@activate 등 기록된 실제 발동 이유를 알고 싶은 분
-- 키워드 일치 횟수·재귀 단계·Sticky 남은 횟수·주입 위치와 순서로 예상 밖의 발동 원인을 추적하고 싶은 분
-- 채팅을 벗어나지 않고 마크다운 본문과 이미 저장한 번역을 읽고 싶은 분
-- 활성 로어의 토큰 합계를 확인하거나, 호환 STLO의 Jev 출처를 구분하고, 로어북 매니저에서 해당 항목을 바로 열고 싶은 분
-
-## 사용 설명서
-
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="활성 로어 목록 / Activated lore list" width="860" /></p>
+## 📖 사용 설명서
 
 ### 1. 답변을 생성하고 책 버튼 누르기
 
-평소처럼 RP → 떠 있는 책 버튼 → 로어 선택 → 읽고 닫기. 책의 숫자는 추적된 로어 항목 수입니다. 목록은 마지막 일반 RP를 기준으로 갱신되며 토큰 계산용 미리보기나 quiet generation은 덮어쓰지 않습니다. Outlet은 생성 요청에 내용이 들어갔는지 확인합니다. 전체 프롬프트를 토큰 단위로 검사하는 도구는 아닙니다.
+평소처럼 RP → 떠 있는 책 버튼 → 로어 선택 → 읽고 닫기.  
+책의 숫자는 추적된 로어 항목 수입니다.  
+목록은 마지막 일반 RP를 기준으로 갱신되며 토큰 계산용 미리보기나 quiet generation은 덮어쓰지 않습니다.  
+Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.  
+전체 프롬프트를 토큰 단위로 검사하는 도구는 아닙니다.
+
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="활성 로어 목록 / Activated lore list" width="860" /></p>
+
+<details>
+<summary>사용 흐름 그림으로 보기</summary>
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="사용 흐름 / Workflow" width="860" /></p>
+
+</details>
 
 ### 2. 본문과 발동 이유 읽기
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
 
 
-목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다. 벡터 설정이어도 키워드로 발동할 수 있습니다. 키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다. 아웃렛 로어의 본문이 최종 생성 요청에서 확인되면 발동 이유 뒤에 **아웃렛 경유**를 표시합니다(예: 🔵 상시 주입 · 아웃렛 경유). 아웃렛은 별도의 발동 원인이 아닌 주입 경로입니다. 본문 비교 방식이므로 다른 위치에 동일한 문장이 있거나 매크로 등으로 본문이 변형된 경우에는 정확한 경로 판별이 어려울 수 있습니다.
+목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다.  
+벡터 설정이어도 키워드로 발동할 수 있습니다.  
+키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다.  
+아웃렛 로어의 본문이 최종 생성 요청에서 확인되면 발동 이유 뒤에 **아웃렛 경유**를 표시합니다(예: 🔵 상시 주입 · 아웃렛 경유).  
+아웃렛은 별도의 발동 원인이 아닌 주입 경로입니다.  
+본문 비교 방식이므로 다른 위치에 동일한 문장이 있거나 매크로 등으로 본문이 변형된 경우에는 정확한 경로 판별이 어려울 수 있습니다.
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="설정과 실제 발동 원인 / Activation cause" width="860" /></p>
 
-기본 열람창에서는 로어북 매니저 원본·포크의 유효한 제목·본문 번역을 우선 표시하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다. 유효한 번역이 없으면 원문을 표시합니다. 책 버튼 설정에서 **원문으로 보기**를 켜면 목록 제목과 기본 열람창의 제목·본문을 원문으로 표시하고, 끄면 다시 저장 번역을 우선 표시합니다. 독립 로어북 서가는 자체 표시 설정을 따릅니다. 새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다. 열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다. 창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
+기본 열람창에서는 로어북 매니저 원본·포크의 유효한 제목·본문 번역을 우선 표시하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다.  
+유효한 번역이 없으면 원문을 표시합니다.  
+책 버튼 설정에서 **원문으로 보기**를 켜면 목록 제목과 기본 열람창의 제목·본문을 원문으로 표시하고, 끄면 다시 저장 번역을 우선 표시합니다.  
+독립 로어북 서가는 자체 표시 설정을 따릅니다.  
+새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다.  
+열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다.  
+창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
 
 **기록된 발동 이유의 세부 정보:** 일치한 기본·보조 키워드 값과 부정 조건 논리, 확인된 벡터 검색 여부, 여러 원인을 함께 표시할 수 있습니다. 목록의 📌 숫자는 Sticky의 남은 유지 횟수입니다. 원인이 확인되지 않으면 확인 불가로 표시합니다.
 
@@ -315,6 +336,14 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 **보고서 상세:** 키워드별 일치 횟수와 관련 항목, 재귀 단계별 발동 수를 확인합니다. Jev는 키워드 빈도에 포함되지 않으며 숨김 로어북과 비관리자 표시 규칙을 보고서에도 적용합니다.
 
 **자동 로그 정리:** 정상 수집된 최신 보고서만 채팅에 최대 64KiB(UTF-8 JSON)까지 저장합니다. 용량 초과 시 현재 세션에서는 전체 보고서를 확인할 수 있고 저장본에는 일부 생략 안내가 표시됩니다. 정상 스캔 후 구버전 상세 로그와 중복 재귀 기록을 기존 채팅 저장 과정에서 자동 정리하며, 수집이 불완전하면 이전 기록을 유지합니다. 별도 명령어 또는 전체 채팅 파일 검사는 필요하지 않습니다.
+
+## 🧩 함께 쓰면 좋은 확장
+
+호환 STLO의 실제 Jev 결과를 추가 요청 없이 표시합니다. 호환 로어북 매니저의 저장 번역을 읽거나 책 이름과 UID로 정확한 서재 항목을 엽니다. 메모리북은 Jev 표시나 일반 로어 확인에 필수가 아닙니다.
+
+[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+
+아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
 ### 🔮 Jev 표시 연동
 
