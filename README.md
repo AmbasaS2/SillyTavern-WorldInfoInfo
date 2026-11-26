@@ -1,10 +1,12 @@
-# 📚 WorldInfo Info: Insight
+# 📚 WorldInfo Info of Sloth
 
-**WorldInfo Info: Insight is a SillyTavern extension for inspecting the lorebook entries activated for the current roleplay reply, reading their contents, and checking recorded activation reasons without leaving the chat.**
+<!-- Branding update: WorldInfo Info of Sloth; existing installation URL, commands and settings are unchanged. -->
+
+**WorldInfo Info of Sloth is a SillyTavern extension for inspecting the lorebook entries activated for the current roleplay reply, reading their contents, and checking recorded activation reasons without leaving the chat.**
 
 This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), itself based on [LenAnderson's original WorldInfo Info](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo). The floating book, activation list and keyword/recursion report are the work this fork builds upon. Thank you to both authors for making this workflow possible.
 
-[한국어 안내 ↓](#-월드인포인포-인사이트)
+[한국어 안내 ↓](#-나무늘보의-월드인포인포)
 
 **Use this when you want to inspect what lore was activated, not change what is injected.**
 
@@ -31,7 +33,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
-> No separate AI setup is needed. Insight inspects the lore that activated; it does not decide what to recall.
+> No separate AI setup is needed. This fork inspects the lore that activated; it does not decide what to recall.
 
 1. Install this fork, not alongside the original, and reload. No separate AI setup is needed. Generate a normal RP reply and tap the floating book.
 2. Select an entry to read its current body and recorded cause. The configured strategy icon and actual activation cause can differ.
@@ -141,7 +143,7 @@ The total is an estimate of activated-lore text, **not** the full request token 
 
 ### 📚 Optional Lorebook Library Integration
 
-Enable **Link Lorebook Library** to open an entry in the independent floating library provided by [Lorebook Manager: Reading Nook](https://github.com/AmbasaS2/lore-manager) v1.4.85-ambasa.65 or later. Matching uses the lorebook name and entry UID, not its displayed or translated title.
+Enable **Link Lorebook Library** to open an entry in the independent floating library provided by [Sloth the Lorebook Manager](https://github.com/AmbasaS2/lore-manager) v1.4.85-ambasa.65 or later. Matching uses the lorebook name and entry UID, not its displayed or translated title.
 
 If the manager is absent, disabled, incompatible, or cannot open the entry, the built-in read-only reader opens instead. Leave this option off if you prefer the quick viewer and activation explanation. The setting changes navigation only, not lorebook contents, translation data, or prompt injection.
 
@@ -229,13 +231,13 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 
 Compatible STLO marks actual Jev activation without a second request. Compatible Lorebook Manager reads saved translations and optionally opens the exact entry by book name and UID. Memory Books is not required to inspect Jev or any other lore.
 
-[Lorebook Ordering: Curator](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+[Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
 ### 🔮 Jev Recall via STLO
 
-With the compatible [Lorebook Ordering: Curator](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
+With the compatible [Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
 
 This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
 
@@ -247,7 +249,7 @@ WorldInfo Info uses STLO's existing selection and the final World Info activatio
 
 <a id="-월드인포인포"></a>
 
-# 📚 월드인포인포 인사이트
+# 📚 나무늘보의 월드인포인포
 
 **이번 RP에 어떤 로어가 불러와졌는지 채팅 화면에서 바로 확인하는 확장입니다.** 로어를 새로 만들거나 주입 여부를 결정하는 확장이 아닙니다.
 
@@ -398,7 +400,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 호환 STLO의 실제 Jev 결과를 추가 요청 없이 표시합니다. 호환 로어북 매니저의 저장 번역을 읽거나 책 이름과 UID로 정확한 서재 항목을 엽니다. 메모리북은 Jev 표시나 일반 로어 확인에 필수가 아닙니다.
 
-[Lorebook Ordering: Curator](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+[Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
