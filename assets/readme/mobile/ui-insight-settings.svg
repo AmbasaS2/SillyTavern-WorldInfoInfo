@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="445" height="495" viewBox="0 0 445 495" role="img">
+<title>책 버튼 설정 메뉴 / Book-button settings</title>
+<style>text{font-family:'Noto Sans CJK KR', 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif;} .t{font-size:19px;font-weight:650;fill:#293440} .en{font-size:13px;fill:#687681}</style>
+<rect x="0" y="0" width="445" height="495" rx="13" fill="#f0f3f3"/>
+<rect x="22" y="23" width="43" height="43" rx="7" fill="#ffffff" stroke="#8b749e" stroke-width="1"/>
+<path d="M35 36h7l1 2 1-2h7v15h-7l-1 2-1-2h-7z M43 38v15" fill="none" stroke="#8b749e" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<rect x="75" y="23" width="357" height="453" rx="9" fill="#ffffff" stroke="#d9e0e5" stroke-width="1"/>
+<rect x="88" y="37" width="19" height="19" rx="4" fill="#8b749e" stroke="#8b749e" stroke-width="1.4"/>
+<path d="M92.5 46.5l4 4 8-8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="117" y="53" font-size="16" font-weight="650" fill="#293440" text-anchor="start">로어북별로 묶기</text>
+<text x="117" y="71" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Group by lorebook</text>
+<rect x="88" y="92" width="19" height="19" rx="4" fill="#8b749e" stroke="#8b749e" stroke-width="1.4"/>
+<path d="M92.5 101.5l4 4 8-8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="117" y="108" font-size="16" font-weight="650" fill="#293440" text-anchor="start">주입 순서대로 표시</text>
+<text x="117" y="126" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Show in injection order</text>
+<rect x="88" y="147" width="19" height="19" rx="4" fill="#8b749e" stroke="#8b749e" stroke-width="1.4"/>
+<path d="M92.5 156.5l4 4 8-8" fill="none" stroke="#ffffff" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="117" y="163" font-size="16" font-weight="650" fill="#293440" text-anchor="start">대화 메시지 위치 표시</text>
+<text x="117" y="181" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Show chat message positions</text>
+<rect x="88" y="202" width="19" height="19" rx="4" fill="#ffffff" stroke="#a5b1b9" stroke-width="1.4"/>
+<text x="117" y="218" font-size="16" font-weight="650" fill="#293440" text-anchor="start">주입 로어 토큰 합계 표시</text>
+<text x="117" y="236" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Show injected lore token total</text>
+<rect x="88" y="257" width="19" height="19" rx="4" fill="#ffffff" stroke="#a5b1b9" stroke-width="1.4"/>
+<text x="117" y="273" font-size="16" font-weight="650" fill="#293440" text-anchor="start">원문으로 보기</text>
+<text x="117" y="291" font-size="13" font-weight="400" fill="#687681" text-anchor="start">View original text</text>
+<rect x="88" y="312" width="19" height="19" rx="4" fill="#ffffff" stroke="#a5b1b9" stroke-width="1.4"/>
+<text x="117" y="328" font-size="16" font-weight="650" fill="#293440" text-anchor="start">로어북 서가 연동</text>
+<text x="117" y="346" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Link Lorebook Library</text>
+<rect x="88" y="367" width="19" height="19" rx="4" fill="#ffffff" stroke="#a5b1b9" stroke-width="1.4"/>
+<text x="117" y="383" font-size="16" font-weight="650" fill="#293440" text-anchor="start">책 버튼 드래그 허용</text>
+<text x="117" y="401" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Allow dragging the book button</text>
+<path d="M87 435L418 435" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<text x="91" y="453" font-size="14" font-weight="650" fill="#293440" text-anchor="start">책 버튼 위치 초기화</text>
+<text x="91" y="471" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Reset book button position</text>
+</svg>

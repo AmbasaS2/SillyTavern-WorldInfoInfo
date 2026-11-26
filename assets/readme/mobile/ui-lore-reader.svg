@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="365" viewBox="0 0 480 365" role="img">
+<title>로어 열람창 / Lore reader mock-up</title>
+<style>text{font-family:'Noto Sans CJK KR', 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', Arial, sans-serif;} .t{font-size:19px;font-weight:650;fill:#293440} .en{font-size:13px;fill:#687681}</style>
+<rect x="0" y="0" width="480" height="365" rx="13" fill="#f0f3f3"/>
+<rect x="12" y="12" width="456" height="341" rx="12" fill="#ffffff" stroke="#d9e0e5" stroke-width="1"/>
+<path d="M27 31h7l1 2 1-2h7v15h-7l-1 2-1-2h-7z M35 33v15" fill="none" stroke="#8b749e" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<text x="55" y="35" font-size="18" font-weight="650" fill="#293440" text-anchor="start">로어 열람창</text>
+<text x="55" y="53" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Lore reader</text>
+<path d="M440 33l10 10m0 -10l-10 10" fill="none" stroke="#687681" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/>
+<path d="M24 66L456 66" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<text x="26" y="101" font-size="22" font-weight="650" fill="#293440" text-anchor="start">The first promise</text>
+<rect x="27" y="114" width="155" height="25" rx="5" fill="#e5eee9"/>
+<text x="104.5" y="131" font-size="13" font-weight="650" fill="#577f70" text-anchor="middle">키워드 / Keyword</text>
+<rect x="25" y="153" width="430" height="186" rx="7" fill="#f3f6f8" stroke="#d9e0e5" stroke-width="1"/>
+<text x="37" y="176" font-size="15" font-weight="650" fill="#293440" text-anchor="start">원문</text>
+<text x="37" y="194" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Original text</text>
+<text x="37" y="221" font-size="15" font-weight="400" fill="#293440" text-anchor="start">We promised to tell each other the truth.</text>
+<path d="M37 240L443 240" fill="none" stroke="#d9e0e5" stroke-width="1" stroke-linecap="round"/>
+<text x="37" y="261" font-size="15" font-weight="650" fill="#293440" text-anchor="start">저장 번역문</text>
+<text x="37" y="279" font-size="13" font-weight="400" fill="#687681" text-anchor="start">Saved translation</text>
+<text x="37" y="314" font-size="15" font-weight="400" fill="#293440" text-anchor="start">우리는 서로에게 진실을 말하기로 약속했다.</text>
+</svg>

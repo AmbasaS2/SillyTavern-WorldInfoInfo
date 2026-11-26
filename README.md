@@ -42,7 +42,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## 📖 How to use
 
-> Screenshots show the installed extension in an isolated SillyTavern 1.19.1 test instance with sample lorebooks. No external AI request or personal chat data was used.
+> The bilingual illustrations are simplified UI mock-ups based on the extension controls in SillyTavern, not screenshots. Values and lorebooks are illustrative examples.
 
 ### 1. Generate a reply and open the book
 
@@ -58,11 +58,11 @@ The number on the book indicates the tracked activated entries. The list can be 
 
 The list follows the latest visible generation. Dry runs (including token-counting passes) and background quiet generations do not replace it. Ordinary activated entries are shown promptly; outlet entries are included after checking that their text appears in the assembled generation request. This is not a complete token-by-token prompt inspector.
 
-<p align="left"><img src="assets/readme/mobile/actual-insight-list.jpg" alt="Actual activated lore list from a local example scan" width="200" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="활성 로어 목록 / Activated lore list" width="350" /></p>
 
 ### 2. Select a lore entry to read it
 
-<p align="left"><img src="assets/readme/mobile/actual-insight-reader.jpg" alt="Actual reader with example lore" width="420" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-lore-reader.svg" alt="로어 열람창 / Lore reader" width="400" /></p>
 
 
 Select an entry in the list to open a floating reader rather than navigate away to the lorebook editor.
@@ -89,7 +89,7 @@ This is a read-only integration, not a translation engine. It does not start AI 
 
 Right-click the floating book on desktop or long-press it on mobile. Both the entry list and settings panel align their top edge with the book whenever the viewport allows.
 
-<p align="left"><img src="assets/readme/mobile/actual-insight-settings.jpg" alt="Actual book-button settings" width="266" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-insight-settings.svg" alt="책 버튼 설정 / Book-button settings" width="365" /></p>
 
 **Group by lorebook**  
 Groups entries by their source lorebook.  
@@ -249,7 +249,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## 📖 사용 설명서
 
-> 아래 화면은 실리태번 1.19.1 테스트 환경에서 실제 확장을 열어 예시 로어북으로 캡처했습니다. 외부 AI 호출이나 개인 대화 데이터는 사용하지 않았습니다.
+> 안내 이미지는 실제 실리태번 확장의 조작 화면을 바탕으로 정리한 한영 병기 UI 목업입니다. 설정값과 로어북은 이해를 돕기 위한 예시입니다.
 
 ### 1. 답변을 생성하고 책 버튼 누르기
 
@@ -259,7 +259,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.  
 전체 프롬프트를 토큰 단위로 검사하는 도구는 아닙니다.
 
-<p align="left"><img src="assets/readme/mobile/actual-insight-list.jpg" alt="Actual activated lore list from a local example scan" width="200" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="활성 로어 목록 / Activated lore list" width="350" /></p>
 
 <details>
 <summary>사용 흐름 그림으로 보기</summary>
@@ -269,7 +269,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 ### 2. 본문과 발동 이유 읽기
 
-<p align="left"><img src="assets/readme/mobile/actual-insight-reader.jpg" alt="Actual reader with example lore" width="420" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-lore-reader.svg" alt="로어 열람창 / Lore reader" width="400" /></p>
 
 
 목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다.  
@@ -294,7 +294,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다. 목록과 설정창 모두 화면 공간이 허용하는 한 책 버튼의 윗선에 맞춰 열립니다.
 
-<p align="left"><img src="assets/readme/mobile/actual-insight-settings.jpg" alt="Actual book-button settings" width="266" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-insight-settings.svg" alt="책 버튼 설정 / Book-button settings" width="365" /></p>
 
 **로어북별로 묶기**  
 켜짐. 책별로 표시
