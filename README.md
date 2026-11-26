@@ -27,13 +27,11 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.8.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+**Current version: 1.7.1-ambasa.8.**
 
-<details>
-<summary>View the workflow</summary>
-
-
-</details>
+> **Generate a reply → tap the book → choose an entry → read.**
+>
+> No separate AI setup is needed. Insight inspects the lore that activated; it does not decide what to recall.
 
 1. Install this fork, not alongside the original, and reload. No separate AI setup is needed. Generate a normal RP reply and tap the floating book.
 2. Select an entry to read its current body and recorded cause. The configured strategy icon and actual activation cause can differ.
@@ -46,88 +44,100 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ### 1. Generate a reply and open the book
 
-<details>
-<summary>View the workflow</summary>
-
-
-</details>
-
 **Generate a reply → open the floating book → select an entry → read its contents and recorded activation cause.**
 
-The number on the book indicates the tracked activated entries. The list can be grouped by lorebook or arranged by injection position and order. Entries use the existing strategy icons; the reader shows the recorded activation cause separately.
+**What the list tells you**
 
-The list follows the latest visible generation. Dry runs (including token-counting passes) and background quiet generations do not replace it. Ordinary activated entries are shown promptly; outlet entries are included after checking that their text appears in the assembled generation request. This is not a complete token-by-token prompt inspector.
+- **Book number:** the tracked activated-entry count.
+- **Grouping and order:** group by lorebook or show insertion positions and order.
+- **Strategy icons:** the configured activation strategy, not necessarily the recorded reason.
 
-<p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="활성 로어 목록 / Activated lore list" width="350" /></p>
+> [!NOTE]
+> The list follows the latest visible generation. Dry runs (including token counting) and background quiet generations do not replace it. Ordinary entries appear promptly; outlets are shown after their text is checked against the assembled generation request. This is not a token-by-token prompt inspector.
+
+<p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="활성 로어 목록 / Activated lore list" width="480" /></p>
 
 ### 2. Select a lore entry to read it
 
-<p align="left"><img src="assets/readme/mobile/ui-lore-reader.svg" alt="로어 열람창 / Lore reader" width="400" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-lore-reader.svg" alt="로어 열람창 / Lore reader" width="480" /></p>
 
 
-Select an entry in the list to open a floating reader rather than navigate away to the lorebook editor.
+Select a lore entry to open the floating, read-only reader without leaving the chat.
 
-- Read the title and body as formatted Markdown with the active SillyTavern theme and chat typography.
-- See recorded causes such as a keyword match, secondary keyword condition, always-active injection, confirmed vector search, sticky continuation, external activation, or an `@@activate` directive. If the cause cannot be established, the reader says so. Recorded primary and secondary keyword values can be displayed, as can applicable negative keyword logic. Multiple confirmed causes may be shown together. The list shows a pin and remaining rounds for active Sticky entries.
-- Drag the reader by its header; desktop and mobile reader positions are remembered separately.
-- The reader loads the current lorebook entry when opened. It does not edit the lorebook or reconstruct an exact historical copy of the request.
+**What you can read**
 
-The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation. If the existing outlet text check passes, the reader appends **Via outlet** to the recorded cause (e.g. Always active · Via outlet). This describes the insertion route, not a separate activation cause. Matching text may also occur elsewhere, and transformed text may fail to match.
+- The title and Markdown body, using the active SillyTavern theme and chat typography.
+- Recorded primary/secondary keyword values and applicable negative keyword logic.
+- Multiple confirmed causes, if recorded.
+- A pin and remaining rounds for Sticky entries in the list.
 
+| Recorded cause | Meaning |
+| --- | --- |
+| Keyword match | A recorded primary/secondary keyword condition matched |
+| Always active | Constant injection |
+| Vector search | Confirmed vector retrieval |
+| Sticky continuation | An earlier activation remains active |
+| External activation | Another feature or extension activated the entry |
+| `@@activate` | Activation through the directive |
+| Unknown | Insufficient evidence for the cause |
+
+**Configured strategy ≠ actual cause.** A vectorized entry can activate because a keyword matched.
+
+- **Via outlet:** appended when the outlet text check passes (e.g. Always active · Via outlet). It describes the insertion route, not a separate cause.
+- Text matching can be ambiguous when the same text appears elsewhere or transformed text fails to match.
+- Drag the header to move the reader. Desktop and mobile positions are remembered separately.
+
+> [!NOTE]
+> The reader loads the current stored entry. It neither edits the lorebook nor reconstructs a historical request.
 
 ### 🌐 Read Existing Translations
 
-If compatible saved translations exist, the built-in reader displays them by default without translating the entry again. Enable **View original text** in the book button settings to display original titles and bodies instead; turn it off to return to saved translations. This also applies to titles in the WorldInfo Info list. The independent Lorebook Library keeps its own display settings.
+**Read a saved translation without making another translation request.**
+
+- Turn **View original text** on to show original titles in the list and original titles/bodies in the built-in reader.
+- Turn it off to return to compatible saved translations.
+- The independent Lorebook Library follows its own display setting.
 
 - **Lorebook Manager (original and fork):** reads the fork's current per-lorebook translation JSON when the reader opens, and compatible settings-based translations from the original or older fork versions. Valid translated titles and bodies are supported.
 - **Cherry&Solti's lorebook translator (RT):** uses a valid saved body translation when no usable Manager body translation is available.
 - **No usable translation:** displays the original text. Missing, stale, or unavailable translations do not block reading.
 
-This is a read-only integration, not a translation engine. It does not start AI translation, change saved translations, or substitute translated text into the roleplay prompt. Per-book file lookup takes place on reader open, not during generation or list display.
+**Read-only integration:** no new AI translation, no changes to saved translations or the RP prompt.
+
+Per-book file lookup happens when the reader opens, not during generation or list display.
 
 ### 3. Optional book-button settings
 
 Right-click the floating book on desktop or long-press it on mobile. Both the entry list and settings panel align their top edge with the book whenever the viewport allows.
 
-<p align="left"><img src="assets/readme/mobile/ui-insight-settings.svg" alt="책 버튼 설정 / Book-button settings" width="365" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-insight-settings.svg" alt="책 버튼 설정 / Book-button settings" width="480" /></p>
 
-**Group by lorebook**  
-Groups entries by their source lorebook.  
-**Default**: On
+| List settings | Default | Effect |
+| --- | --- | --- |
+| Group by lorebook | On | Group by source lorebook |
+| Show in injection order | On | Sort by insertion position and order rather than title |
+| Show chat message positions | On | Show intervening messages when grouping is off and injection ordering is on |
+| Show injected lore token total | Off | Estimate lore-only tokens after generation, when the list is opened |
 
-**Show in injection order**  
-Orders entries by insertion position and order rather than title.  
-**Default**: On
+| Reading and button settings | Default | Effect |
+| --- | --- | --- |
+| View original text | Off | Show original list titles and reader titles/bodies; skip translation lookup |
+| Link Lorebook Library | Off | Open the exact entry in the compatible library instead of the built-in reader |
+| Allow dragging the book button | Off | Move the floating book |
+| Reset book button position | Action | Restore the original position |
 
-**Show chat message positions**  
-With grouping off and injection ordering on, shows intervening chat message positions.  
-**Default**: On
-
-**Show injected lore token total**  
-Shows an approximate total of the injected lore text after generation has finished and the list is opened.  
-**Default**: Off
-
-**View original text**  
-Shows original titles in the list and original titles and bodies in the built-in reader; skips saved-translation lookup.  
-**Default**: Off
-
-**Link Lorebook Library**  
-Opens the exact entry in the optional Lorebook Manager Library instead of the built-in reader when available.  
-**Default**: Off
-
-**Allow dragging the book button**  
-Lets you move the floating book.  
-**Default**: Off
-
-**Reset book button position**  
-Returns the floating book to its original position.  
-**Default**: Action
+> [!TIP]
+> To inspect the position of lore relative to chat messages, turn grouping off and keep injection ordering and message positions on.
 
 ### 🧮 Optional Token Total
 
-Enable **Show injected lore token total** if you want an estimate of the tokens used by the tracked lore entries. A nonempty list is counted together using SillyTavern's tokenizer after the visible reply finishes; the calculation is deferred until the list is open. The footer is shown as `Total 1,248` (example).
+Enable **Show injected lore token total** to show a footer such as `Total 1,248` (example).
 
-No token-counting work is started during generation or streaming. The total is not the full request token count or an exact API billing figure.
+- Counts the nonempty tracked lore list together using SillyTavern's tokenizer.
+- Waits until the visible reply finishes and the list is opened.
+- Does not start token counting during generation or streaming.
+
+The total is an estimate of activated-lore text, **not** the full request token count or an exact API bill.
 
 ### 📚 Optional Lorebook Library Integration
 
@@ -137,20 +147,35 @@ If the manager is absent, disabled, incompatible, or cannot open the entry, the 
 
 ### 4. Keyword and Recursion Report
 
-The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches, occurrence counts, and recursion rounds. This version continues to provide this report; activation records are kept compact, and hidden-book filtering is retained for the report and its visible counts.
+Enter `/wi-report` after a reply to open aikohanasaki's original keyword and recursion report.
 
-The latest successfully captured report is saved with the chat (up to 64 KiB of UTF-8 JSON); oversized reports remain complete in the current session, and shortened saved reports are marked. Legacy diagnostic logs and duplicate recursion metadata are retired automatically after a verified scan, using the usual chat save. Incomplete captures leave previous saved data untouched. No cleanup command or background file scan is needed.
+**What the report shows**
 
-A report with no recorded keyword is not proof that a lore entry was never activated; entries can activate for other reasons. The report lists keyword counts and associated entries, with a per-recursion-round breakdown. Jev is a recall source, not a keyword hit. Hidden-lorebook rules are respected for non-admin users and visible report counts.
+- Recorded keyword matches and counts, with associated entries.
+- Activation counts and entries by recursion round.
+- Hidden-book filtering for non-admin users and visible counts.
 
-**`/wi-report`**  
-Open the lore keyword and recursion report.
+**What the report does not show**
 
-**`/wi-triggered`**  
-Return the last displayed entry list as JSON.
+- A missing recorded keyword is not proof an entry never activated.
+- Jev is a recall source, not a keyword hit.
 
-**`/wi-position-reset`**  
-Reset the floating book position.
+**Commands**
+
+| Command | Action |
+| --- | --- |
+| `/wi-report` | Open the keyword and recursion report |
+| `/wi-triggered` | Return the last displayed list as JSON |
+| `/wi-position-reset` | Reset the floating book position |
+
+**Automatic log housekeeping**
+
+- Saves only the latest successfully captured report with the chat (up to 64 KiB of UTF-8 JSON).
+- Keeps oversized reports complete in the current session and marks shortened saved reports.
+- Retires legacy diagnostic logs and duplicate recursion metadata after a verified scan, using the usual chat save.
+- Leaves previous saved data untouched if capture is incomplete.
+
+No cleanup command or background file scan is needed.
 
 ## 🌍 Interface Languages
 
@@ -192,7 +217,11 @@ This fork focuses on reading and inspecting lore directly during RP. The origina
 
 ## 🪶 Scope and Performance
 
-The extension observes existing generation events rather than performing a second lorebook activation scan. Sticky metadata is read from existing in-memory state. Opening the list toggles already-rendered entries. Translation lookup is scoped to the selected book when the reader is opened; there is no new polling or automatic AI translation. Optional token counting waits until the reply ends.
+- **Activation tracking:** observes existing generation events, without a second lorebook activation scan.
+- **Sticky:** reads existing in-memory metadata.
+- **List:** opens or closes already-rendered entries.
+- **Translation:** looks up the selected book when its reader opens; no new polling or automatic AI translation.
+- **Token count:** optional, after the reply ends.
 
 WorldInfo Info does not decide what lore should be activated or injected. The core activation rules, probability, budget, recursion, and prompt assembly remain SillyTavern's responsibility.
 
@@ -240,7 +269,11 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.8.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
+**현재 버전: 1.7.1-ambasa.8.**
+
+> **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
+>
+> 캐릭터가 왜 그 설정을 기억했는지 확인할 수 있어요. 별도 AI 연결이나 다른 확장은 필요 없습니다. 로어를 새로 호출하는 확장이 아닙니다.
 
 1. 원본과 동시에 켜지 말고 설치·새로고침  → 별도 AI 설정 없이 일반 RP 답변 생성 → 책 버튼 누르기.
 2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
@@ -253,82 +286,113 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ### 1. 답변을 생성하고 책 버튼 누르기
 
-평소처럼 RP → 떠 있는 책 버튼 → 로어 선택 → 읽고 닫기.  
-책의 숫자는 추적된 로어 항목 수입니다.  
-목록은 마지막 일반 RP를 기준으로 갱신되며 토큰 계산용 미리보기나 quiet generation은 덮어쓰지 않습니다.  
-Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.  
-전체 프롬프트를 토큰 단위로 검사하는 도구는 아닙니다.
+평소처럼 롤플하고 떠 있는 책 버튼을 누릅니다.
 
-<p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="활성 로어 목록 / Activated lore list" width="350" /></p>
+- 책 버튼의 숫자: 추적된 활성 로어 항목 수
+- 목록: 마지막 일반 RP 기준
+- 로어 제목을 누르면 열람창이 열립니다.
 
-<details>
-<summary>사용 흐름 그림으로 보기</summary>
+> [!NOTE]
+> 토큰 계산용 미리보기나 quiet generation은 목록을 덮어쓰지 않습니다. 아웃렛(Outlet)은 최종 생성 요청에 실제 내용이 있는지 확인한 뒤 표시합니다. 전체 프롬프트를 토큰 단위로 검사하는 도구는 아니에요.
 
-
-</details>
+<p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="활성 로어 목록 / Activated lore list" width="480" /></p>
 
 ### 2. 본문과 발동 이유 읽기
 
-<p align="left"><img src="assets/readme/mobile/ui-lore-reader.svg" alt="로어 열람창 / Lore reader" width="400" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-lore-reader.svg" alt="로어 열람창 / Lore reader" width="480" /></p>
 
 
-목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다.  
-벡터 설정이어도 키워드로 발동할 수 있습니다.  
-키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다.  
-아웃렛 로어의 본문이 최종 생성 요청에서 확인되면 발동 이유 뒤에 **아웃렛 경유**를 표시합니다(예: 🔵 상시 주입 · 아웃렛 경유).  
-아웃렛은 별도의 발동 원인이 아닌 주입 경로입니다.  
-본문 비교 방식이므로 다른 위치에 동일한 문장이 있거나 매크로 등으로 본문이 변형된 경우에는 정확한 경로 판별이 어려울 수 있습니다.
+**목록의 아이콘과 실제 발동 이유는 다를 수 있어요!**
 
+벡터화로 설정한 로어가 이번에는 키워드 일치로 발동할 수도 있습니다. 열람창에서 기록된 실제 원인을 확인하세요.
 
-기본 열람창에서는 로어북 매니저 원본·포크의 유효한 제목·본문 번역을 우선 표시하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다.  
-유효한 번역이 없으면 원문을 표시합니다.  
-책 버튼 설정에서 **원문으로 보기**를 켜면 목록 제목과 기본 열람창의 제목·본문을 원문으로 표시하고, 끄면 다시 저장 번역을 우선 표시합니다.  
-독립 로어북 서가는 자체 표시 설정을 따릅니다.  
-새 번역 요청은 없으며 AI에 들어가는 로어를 바꾸지 않습니다.  
-열람창은 현재 저장된 로어를 읽는 창이므로 과거 답변 당시의 본문 스냅샷은 아닙니다.  
-창의 헤더로 위치를 옮길 수 있고 모바일/PC 위치는 따로 기억됩니다.
+| 발동 이유 | 뜻 |
+| --- | --- |
+| 🟢 키워드 일치 | 기본·보조 키워드 조건 일치 |
+| 🔵 상시 주입 | 항상 활성화되는 항목 |
+| 벡터 검색 | 확인된 벡터 검색 결과 |
+| 📌 Sticky 유지 | 이전 발동이 유지되는 상태 |
+| 외부 활성화 | 다른 확장·기능이 활성화 |
+| `@@activate` | 해당 지시에 따른 활성화 |
+| 확인 불가 | 원인을 확인할 기록이 부족함 |
 
-**기록된 발동 이유의 세부 정보:** 일치한 기본·보조 키워드 값과 부정 조건 논리, 확인된 벡터 검색 여부, 여러 원인을 함께 표시할 수 있습니다. 목록의 📌 숫자는 Sticky의 남은 유지 횟수입니다. 원인이 확인되지 않으면 확인 불가로 표시합니다.
+일치한 기본·보조 키워드와 부정 조건 논리도 기록된 경우 표시합니다. 여러 원인이 확인되면 함께 표시할 수 있어요. 목록의 📌 숫자는 Sticky의 남은 유지 횟수입니다.
+
+**아웃렛 경유가 뭔가요?**
+
+- 예: 🔵 상시 주입 · 아웃렛 경유
+- 본문이 최종 생성 요청에 확인됐을 때 덧붙이는 주입 경로입니다. 별도의 발동 원인은 아닙니다.
+- 동일한 문장이 다른 위치에 있거나 매크로 등으로 본문이 변형되면 판별이 어려울 수 있습니다.
+
+#### 🌐 저장된 번역문 읽기
+
+| 호환 번역 | 읽는 내용 |
+| --- | --- |
+| 로어북 매니저 원본·포크 | 유효한 제목·본문 번역 |
+| Cherry&Solti RT | 매니저 본문 번역이 없을 때 저장 본문 번역 |
+| 사용할 수 있는 번역 없음 | 원문 |
+
+**원문을 보고 싶다면?** 책 버튼 설정 → **원문으로 보기** 체크.
+
+- 켜면 목록 제목과 기본 열람창 제목·본문을 원문으로 표시합니다.
+- 끄면 다시 저장 번역을 우선 표시합니다.
+- 독립 서재는 자체 표시 설정을 따릅니다.
+
+> [!TIP]
+> 새 번역 요청은 없으며 AI에 들어가는 로어도 바꾸지 않습니다. 현재 저장된 본문을 읽는 기능이므로 과거 답변 당시의 본문 스냅샷은 아니에요.
+
+창 헤더를 끌어 위치를 옮길 수 있습니다. 모바일·PC 위치는 따로 기억합니다.
 
 ### 3. 설정하기
 
 책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다. 목록과 설정창 모두 화면 공간이 허용하는 한 책 버튼의 윗선에 맞춰 열립니다.
 
-<p align="left"><img src="assets/readme/mobile/ui-insight-settings.svg" alt="책 버튼 설정 / Book-button settings" width="365" /></p>
+<p align="left"><img src="assets/readme/mobile/ui-insight-settings.svg" alt="책 버튼 설정 / Book-button settings" width="480" /></p>
 
-**로어북별로 묶기**  
-켜짐. 책별로 표시
+| 목록 설정 | 기본값 | 설명 |
+| --- | --- | --- |
+| 로어북별로 묶기 | 켜짐 | 책별로 표시 |
+| 주입 순서대로 표시 | 켜짐 | 끄면 제목순 |
+| 대화 메시지 위치 표시 | 켜짐 | 책별 묶기 OFF·주입 순서 ON일 때 표시 |
+| 주입 로어 토큰 합계 표시 | 꺼짐 | 답변 후 목록을 열 때 로어 토큰 근사값 계산 |
 
-**주입 순서대로 표시**  
-켜짐. 끄면 제목순
+| 열람·버튼 설정 | 기본값 | 설명 |
+| --- | --- | --- |
+| 원문으로 보기 (View original text) | 꺼짐 | 목록 제목과 기본 열람창 제목·본문 원문 표시, 번역 조회 생략 |
+| 로어북 서가 연동 | 꺼짐 | 호환 로어북 매니저 서재에서 정확한 항목 열기 |
+| 책 버튼 드래그 허용 | 꺼짐 | 원하는 위치로 이동 |
+| 책 버튼 위치 초기화 | 실행 버튼 | 원래 위치로 복귀 |
 
-**대화 메시지 위치 표시**  
-켜짐. 책별 묶기를 끄고 주입 순서를 켰을 때 표시
+> [!TIP]
+> 책별 묶기만 끄고 주입 순서와 대화 메시지 위치 표시를 켜면 책 구분 없이 주입 배치를 확인할 수 있어요.
 
-**주입 로어 토큰 합계 표시**  
-꺼짐. 답변 후 목록을 열 때만 로어 텍스트의 대략적 토큰 계산
-
-**원문으로 보기 (View original text)**  
-꺼짐. 목록 제목과 기본 열람창 제목·본문을 원문으로 표시하며 번역 조회를 생략
-
-**로어북 서가 연동**  
-꺼짐. 로어북 매니저 호환 포크에서 정확한 항목으로 이동
-
-**책 버튼 드래그 허용**  
-꺼짐. 위치 이동 시만 켜기
-
-**책 버튼 위치 초기화**  
-원래 위치로 복귀
-
-로어북 서가 연동에 실패하거나 호환 확장이 없으면 기본 열람창을 엽니다. 번역기나 서재 확장은 필수가 아닙니다.
+서가 연동에 실패하거나 호환 확장이 없으면 기본 열람창을 엽니다. 번역기나 서재 확장은 필수가 아닙니다.
 
 ### 4. 키워드·재귀 보고서
 
-`/wi-report`는 키워드 일치와 재귀 단계·발동 횟수를 확인하는 원본 기능입니다. `/wi-triggered`는 마지막 목록 JSON, `/wi-position-reset`은 책 버튼 위치 초기화입니다.
+| 명령어 | 기능 |
+| --- | --- |
+| `/wi-report` | 키워드 일치·재귀 단계·발동 횟수 보고서 열기 |
+| `/wi-triggered` | 마지막 목록 JSON 반환 |
+| `/wi-position-reset` | 책 버튼 위치 초기화 |
 
-**보고서 상세:** 키워드별 일치 횟수와 관련 항목, 재귀 단계별 발동 수를 확인합니다. Jev는 키워드 빈도에 포함되지 않으며 숨김 로어북과 비관리자 표시 규칙을 보고서에도 적용합니다.
+**보고서에서 확인하는 것**
 
-**자동 로그 정리:** 정상 수집된 최신 보고서만 채팅에 최대 64KiB(UTF-8 JSON)까지 저장합니다. 용량 초과 시 현재 세션에서는 전체 보고서를 확인할 수 있고 저장본에는 일부 생략 안내가 표시됩니다. 정상 스캔 후 구버전 상세 로그와 중복 재귀 기록을 기존 채팅 저장 과정에서 자동 정리하며, 수집이 불완전하면 이전 기록을 유지합니다. 별도 명령어 또는 전체 채팅 파일 검사는 필요하지 않습니다.
+- 키워드별 기록된 일치 횟수와 관련 항목
+- 재귀 단계별 발동 수
+- Jev는 키워드 빈도에 포함하지 않습니다.
+- 숨김 로어북과 비관리자 표시 규칙도 적용합니다.
+
+**재귀란?** 먼저 발동한 로어의 본문에 다른 로어의 키워드가 있어서 연달아 발동하는 경우예요. 기록이 부족하면 원인을 확인하기 어렵습니다.
+
+**로그는 자동으로 정리합니다.**
+
+- 정상 수집된 최신 보고서만 채팅에 최대 64KiB(UTF-8 JSON) 저장
+- 상한 초과: 현재 세션은 전체 보고서, 저장본은 일부 생략 안내 표시
+- 정상 스캔 후: 구버전 상세 로그·중복 재귀 기록을 기존 채팅 저장 과정에서 자동 정리
+- 수집 불완전: 이전 기록 유지
+
+별도 정리 명령어나 전체 채팅 파일 검사는 필요 없습니다.
 
 ## 🧩 함께 쓰면 좋은 확장
 
