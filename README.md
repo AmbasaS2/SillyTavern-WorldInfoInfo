@@ -32,7 +32,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 <details>
 <summary>View the workflow</summary>
 
-<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
+<p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="520"></p>
 
 </details>
 
@@ -49,7 +49,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 <summary>View the workflow</summary>
 
 <p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="Generate a reply, open the book, select a lore entry and read an available saved translation" width="860" /></a>
+  <a href="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="Generate a reply, open the book, select a lore entry and read an available saved translation" width="520" /></a>
 </p>
 
 </details>
@@ -61,12 +61,12 @@ The number on the book indicates the tracked activated entries. The list can be 
 The list follows the latest visible generation. Dry runs (including token-counting passes) and background quiet generations do not replace it. Ordinary activated entries are shown promptly; outlet entries are included after checking that their text appears in the assembled generation request. This is not a complete token-by-token prompt inspector.
 
 <p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Floating book and activated lore list" width="900" /></a>
+  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Floating book and activated lore list" width="520" /></a>
 </p>
 
 ### 2. Select a lore entry to read it
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="520" /></p>
 
 
 Select an entry in the list to open a floating reader rather than navigate away to the lorebook editor.
@@ -78,7 +78,7 @@ Select an entry in the list to open a floating reader rather than navigate away 
 
 The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation. If the existing outlet text check passes, the reader appends **Via outlet** to the recorded cause (e.g. Always active · Via outlet). This describes the insertion route, not a separate activation cause. Matching text may also occur elsewhere, and transformed text may fail to match.
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="Configured strategy vs recorded activation reason / 설정과 발동 이유" width="860" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="Configured strategy vs recorded activation reason / 설정과 발동 이유" width="520" /></p>
 
 ### 🌐 Read Existing Translations
 
@@ -95,7 +95,7 @@ This is a read-only integration, not a translation engine. It does not start AI 
 Right-click the floating book on desktop or long-press it on mobile. Both the entry list and settings panel align their top edge with the book whenever the viewport allows.
 
 <p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="Settings menu including original text, optional token total and Lorebook Library integration" width="860" /></a>
+  <a href="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="Settings menu including original text, optional token total and Lorebook Library integration" width="520" /></a>
 </p>
 
 **Group by lorebook**  
@@ -264,18 +264,18 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.  
 전체 프롬프트를 토큰 단위로 검사하는 도구는 아닙니다.
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="활성 로어 목록 / Activated lore list" width="860" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="활성 로어 목록 / Activated lore list" width="520" /></p>
 
 <details>
 <summary>사용 흐름 그림으로 보기</summary>
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="사용 흐름 / Workflow" width="860" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="사용 흐름 / Workflow" width="520" /></p>
 
 </details>
 
 ### 2. 본문과 발동 이유 읽기
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="520" /></p>
 
 
 목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다.  
@@ -285,7 +285,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 아웃렛은 별도의 발동 원인이 아닌 주입 경로입니다.  
 본문 비교 방식이므로 다른 위치에 동일한 문장이 있거나 매크로 등으로 본문이 변형된 경우에는 정확한 경로 판별이 어려울 수 있습니다.
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="설정과 실제 발동 원인 / Activation cause" width="860" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="설정과 실제 발동 원인 / Activation cause" width="520" /></p>
 
 기본 열람창에서는 로어북 매니저 원본·포크의 유효한 제목·본문 번역을 우선 표시하고, 본문 번역이 없으면 Cherry&Solti RT의 저장된 본문 번역을 확인합니다.  
 유효한 번역이 없으면 원문을 표시합니다.  
@@ -301,7 +301,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다. 목록과 설정창 모두 화면 공간이 허용하는 한 책 버튼의 윗선에 맞춰 열립니다.
 
-<p align="center"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="설정 화면 / Settings" width="860" /></p>
+<p align="center"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="설정 화면 / Settings" width="520" /></p>
 
 **로어북별로 묶기**  
 켜짐. 책별로 표시
