@@ -57,6 +57,8 @@
   "worldInfoInfo.command.report.done": "已開啟關鍵字報告。",
   "worldInfoInfo.report.title": "世界書關鍵字報告",
   "worldInfoInfo.report.summary": "已注入條目 {0} 個 · 關鍵字類型 {1} 種",
+  "worldInfoInfo.report.truncated": "由於儲存容量限制，部分紀錄已省略。產生新回覆即可查看目前完整報告。",
+  "worldInfoInfo.report.incomplete": "啟用紀錄收集不完整，已保留先前儲存的報告。",
   "worldInfoInfo.report.empty": "最近一次生成沒有啟用紀錄。",
   "worldInfoInfo.report.loopSummary": "遞迴第 {0} 回合：{1} 個",
   "worldInfoInfo.report.loopTitle": "遞迴第 {0} 回合",

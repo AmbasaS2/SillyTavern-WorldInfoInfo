@@ -57,6 +57,8 @@
   "worldInfoInfo.command.report.done": "已打开关键词报告。",
   "worldInfoInfo.report.title": "世界书关键词报告",
   "worldInfoInfo.report.summary": "已注入条目 {0} 个 · 关键词类型 {1} 种",
+  "worldInfoInfo.report.truncated": "由于存储容量限制，部分记录已省略。生成新回复即可查看当前完整报告。",
+  "worldInfoInfo.report.incomplete": "激活记录收集不完整，已保留之前保存的报告。",
   "worldInfoInfo.report.empty": "最近一次生成暂无激活记录。",
   "worldInfoInfo.report.loopSummary": "递归第 {0} 轮：{1} 个",
   "worldInfoInfo.report.loopTitle": "递归第 {0} 轮",

@@ -57,6 +57,8 @@
   "worldInfoInfo.command.report.done": "Rapport des mots-clés ouvert.",
   "worldInfoInfo.report.title": "Rapport des mots-clés du lore",
   "worldInfoInfo.report.summary": "Entrées insérées : {0} · Types de mots-clés : {1}",
+  "worldInfoInfo.report.truncated": "Certains enregistrements ont été omis en raison de la limite de stockage. Générez une réponse pour consulter le rapport actuel complet.",
+  "worldInfoInfo.report.incomplete": "La collecte des activations est incomplète. Le rapport enregistré précédent a été conservé.",
   "worldInfoInfo.report.empty": "Aucun événement d’activation enregistré pour la dernière génération.",
   "worldInfoInfo.report.loopSummary": "Boucle {0} : {1} entrées",
   "worldInfoInfo.report.loopTitle": "Boucle {0}",

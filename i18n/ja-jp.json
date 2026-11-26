@@ -57,6 +57,8 @@
   "worldInfoInfo.command.report.done": "キーワード報告を開きました。",
   "worldInfoInfo.report.title": "ロアのキーワード報告",
   "worldInfoInfo.report.summary": "挿入されたロア：{0}件 · キーワード種別：{1}",
+  "worldInfoInfo.report.truncated": "保存容量の上限により一部の記録が省略されています。新しい返信を生成すると現在の完全なレポートを確認できます。",
+  "worldInfoInfo.report.incomplete": "有効化記録の収集が完了しなかったため、以前の保存済みレポートを保持しました。",
   "worldInfoInfo.report.empty": "直近の生成には有効化記録がありません。",
   "worldInfoInfo.report.loopSummary": "再帰{0}回目：{1}件",
   "worldInfoInfo.report.loopTitle": "再帰{0}回目",

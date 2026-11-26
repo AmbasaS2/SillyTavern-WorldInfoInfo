@@ -15,6 +15,7 @@ import { showdown, DOMPurify } from '../../../../lib.js';
 import { tryOpenInLoreLibrary } from './lore-library-link.js';
 import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
+import { canReplaceReport, persistReport } from './report-storage.js';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -80,6 +81,8 @@ const WI_UI_EN = {
     "report.title": "Lore keyword report",
     "report.summary": "Injected lore entries: {0} · Keyword types: {1}",
     "report.empty": "No activation records available for the last generation.",
+    "report.truncated": "This saved report was shortened to fit the storage limit. Generate a reply for a full current report.",
+    "report.incomplete": "Activation capture was incomplete. The previous saved report was retained.",
     "report.loopSummary": "Loop {0}: {1} entries",
     "report.loopTitle": "Loop {0}",
     "report.frequency": "Keyword frequency",
@@ -153,8 +156,6 @@ async function openActiveEntry(world, uid) {
         navigatingEntry = false;
     }
 }
-STWII.MAX_ACTIVATION_EVENTS = STWII.MAX_ACTIVATION_EVENTS ?? 1000;
-STWII.MAX_BUILDS = STWII.MAX_BUILDS ?? 5;
 STWII.MAX_BUILD_LOGS = STWII.MAX_BUILD_LOGS ?? 2000;
 
 function resetWiTriggerPosition(triggerEl = window.STWII?.trigger) {
@@ -176,18 +177,6 @@ function pushBounded(arr, item, max) {
     try {
         arr.push(item);
         if (arr.length > max) arr.splice(0, arr.length - max);
-    } catch {}
-}
-function trimBuilds() {
-    try {
-        const builds = chat_metadata.stwiiBuilds;
-        if (!Array.isArray(builds)) return;
-        while (builds.length > STWII.MAX_BUILDS) {
-            const removed = builds.shift();
-            if (removed && removed.runId != null && Array.isArray(chat_metadata.stwiiActivationEvents)) {
-                chat_metadata.stwiiActivationEvents = chat_metadata.stwiiActivationEvents.filter(e => e?.runId !== removed.runId);
-            }
-        }
     } catch {}
 }
 
@@ -403,6 +392,7 @@ function matchLoreReaderChatTypography(dialog, body) {
 
 // Keep verification on the displayed snapshot, not in saved lore data.
 const confirmedOutletEntries = new WeakSet();
+const displayedActivationEvents = new WeakMap();
 
 // Explain the most recent confirmed activation using the already-captured
 // compact /wi-report event. Do not rescan lore, query vectors, or parse logs
@@ -412,8 +402,9 @@ function describeLoreActivation(entry) {
     // Jev evidence belongs to this displayed entry, not the saved constant flag.
     if (entry?.stwiiJevRecall === true) return '🔮 ' + wiT('reader.reason.jev') + outletSuffix;
     const events = chat_metadata.stwiiLastReport?.added;
-    const ev = Array.isArray(events) ? events.find(item =>
-        item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null;
+    const ev = displayedActivationEvents.has(entry) ? displayedActivationEvents.get(entry) :
+        (Array.isArray(events) ? events.find(item =>
+            item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null);
     const causes = [];
     if (ev) {
         const logic = String(ev.logic || '');
@@ -1211,6 +1202,8 @@ const init = ()=>{
     eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
 
     let lastReportBuild = null;
+    let lastLiveReport = null;
+    let observedActivatedCount = null;
     let lastRenderedGenerationEntries = null;
     let finalizedTokenGeneration = -1;
     let tokenGenerationAwaitingEnd = false;
@@ -1322,6 +1315,7 @@ const init = ()=>{
         finalizedTokenGeneration = -1;
         syncTokenFooter();
         pendingEntries = [];
+        observedActivatedCount = null;
         stwiiCurrentScanMessageCount = null;
         lastReportBuild = null;
         stwiiCurrentBuild = null;
@@ -1352,6 +1346,8 @@ const init = ()=>{
         currentEntryList = [];
         lastRenderedGenerationEntries = null;
         lastReportBuild = null;
+        lastLiveReport = null;
+        observedActivatedCount = null;
         stwiiCurrentBuild = null;
         activationDrafts.clear();
         vectorActivatedIds.clear();
@@ -1370,6 +1366,7 @@ const init = ()=>{
     // Activation events describe scan candidates, not actual final prompt insertion.
     const onWorldInfoActivated = (entryList) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
+        observedActivatedCount = Array.isArray(entryList) ? entryList.length : null;
 
         // SillyTavern has already checked and stored timed effects during this
         // WI scan. Read its in-memory end count directly rather than invoking a
@@ -1385,6 +1382,8 @@ const init = ()=>{
                 const snapshot = jevRecall.annotate(entry);
                 snapshot.type = 'wi';
                 snapshot.sticky = remaining;
+                // A new, not-yet-finalized snapshot must not reuse old reasons.
+                displayedActivationEvents.set(snapshot, null);
                 return snapshot;
             });
         pendingEntries = filtered;
@@ -1401,7 +1400,8 @@ const init = ()=>{
         if (dryRun || !realGenerationInProgress) return;
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
-        const included = confirmedWiEntries(pendingEntries, data);
+        const candidates = pendingEntries;
+        const included = confirmedWiEntries(candidates, data);
         jevRecall.reset();
         pendingEntries = [];
         // Repaint only if an outlet is confirmed or sticky metadata changed;
@@ -1412,24 +1412,42 @@ const init = ()=>{
         // while the request is being sent or while its response is streaming.
         syncTokenFooter();
 
-        // Persist one compact report; never persist the intercepted console logs.
+        // Keep the complete current report in RAM. Only a verified scan
+        // can replace saved metadata and retire legacy logs.
         const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
         const build = lastReportBuild?.chatId === getCurrentChatId() ? lastReportBuild : null;
-        if (build) {
-            const jevIds = new Set(included.filter(entry => entry.stwiiJevRecall === true)
-                .map(entry => String(entry.world) + ':' + String(entry.uid)));
-            build.added = build.added.filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)))
-                .map(ev => jevIds.has(String(ev.world) + ':' + String(ev.uid))
-                    ? { ...ev, jevConfirmed: true, logic: 'JEV', reason: 'jev', primary: null, secondary: [], vectorConfirmed: false }
-                    : ev);
-        }
-        chat_metadata.stwiiLastReport = {
-            runId: build?.runId ?? Date.now(),
-            added: build?.added ?? [],
-            loopCounts: Array.isArray(stwiiCurrentLoopCounts) ? [...stwiiCurrentLoopCounts] : [],
-            loopEntryIds: stwiiCurrentLoopCounts?.length && Array.isArray(chat_metadata.stwiiLastLoopEntryIds)
-                ? chat_metadata.stwiiLastLoopEntryIds.map(ids => Array.isArray(ids) ? [...ids] : null) : [],
+        const complete = canReplaceReport(build, observedActivatedCount, candidates);
+        const captured = build ?? stwiiCurrentBuild;
+        const jevIds = new Set(included.filter(entry => entry.stwiiJevRecall === true)
+            .map(entry => String(entry.world) + ':' + String(entry.uid)));
+        const added = (captured?.added ?? []).filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)))
+            .map(ev => jevIds.has(String(ev.world) + ':' + String(ev.uid))
+                ? { ...ev, jevConfirmed: true, logic: 'JEV', reason: 'jev', primary: null, secondary: [], vectorConfirmed: false }
+                : ev);
+        lastLiveReport = {
+            runId: captured?.runId ?? Date.now(),
+            chatId: getCurrentChatId(),
+            added,
+            logs: captured?.logs ?? [],
+            loopCounts: build?.loopCounts ?? [],
+            loopEntryIds: build?.loopEntryIds ?? [],
+            incomplete: !complete,
         };
+        const eventsById = new Map();
+        for (const ev of added) {
+            const id = String(ev.world) + ':' + String(ev.uid);
+            if (!eventsById.has(id)) eventsById.set(id, ev);
+        }
+        for (const entry of included) {
+            displayedActivationEvents.set(entry, eventsById.get(String(entry.world) + ':' + String(entry.uid)) ?? null);
+        }
+        try {
+            persistReport(chat_metadata, lastLiveReport, complete);
+        } catch (error) {
+            console.warn('[WorldInfo Info] Report storage failed; previous metadata retained', error);
+        }
+        lastReportBuild = null;
+        stwiiCurrentBuild = null;
     };
     eventSource.on(event_types.GENERATE_AFTER_DATA, onGenerateAfterData);
 
@@ -1745,13 +1763,30 @@ const init = ()=>{
     // Currently active loop index (-1 when not within a loop)
     let stwiiActiveLoopIndex = -1;
     let stwiiDryRunActive = false;
-function startBuildSession() {
+function startBuildSession(startedFromScan = false) {
         STWII.currentRunId = Date.now();
-        stwiiCurrentBuild = { runId: STWII.currentRunId, startedAt: Date.now(), added: [], logs: [] };
+        lastReportBuild = null;
+        if (startedFromScan) {
+            observedActivatedCount = null;
+            pendingEntries = [];
+            stwiiCurrentLoopEventIds = [];
+            stwiiActiveLoopIndex = -1;
+        }
+        stwiiCurrentBuild = { runId: STWII.currentRunId, startedFromScan, finished: false, finalCount: null, added: [], logs: [] };
     }
 function endBuildSession() {
         if (!stwiiCurrentBuild) return;
         stwiiCurrentBuild.chatId = getCurrentChatId();
+        stwiiCurrentBuild.finished = true;
+        const counts = Array.isArray(stwiiCurrentLoopCounts) ? [...stwiiCurrentLoopCounts] : [];
+        stwiiCurrentBuild.loopCounts = counts;
+        stwiiCurrentBuild.loopEntryIds = counts.map((count, i) => {
+            const captured = stwiiCurrentLoopEventIds?.[i];
+            const fallback = stwiiCurrentLoopEntryIds?.[i];
+            const ids = Array.isArray(captured) && captured.length === count ? captured
+                : Array.isArray(fallback) && fallback.length === count ? fallback : null;
+            return ids ? [...ids] : null;
+        });
         lastReportBuild = stwiiCurrentBuild;
         stwiiCurrentBuild = null;
     }
@@ -2064,7 +2099,7 @@ function endBuildSession() {
             if (stwiiCurrentBuild && asText) pushBounded(stwiiCurrentBuild.logs, asText, STWII.MAX_BUILD_LOGS);
 
             // Start/end markers
-            if (asText.includes('[WI] --- START WI SCAN') && !stwiiCurrentBuild) startBuildSession();
+            if (asText.includes('[WI] --- START WI SCAN')) startBuildSession(true);
             if (first.includes('--- BUILDING PROMPT ---') && !stwiiCurrentBuild) startBuildSession();
             if (first.includes('--- DONE ---')) endBuildSession();
 
@@ -2101,19 +2136,11 @@ function endBuildSession() {
                 }
             }
 
-            // On BUILDING PROMPT, finalize loop counts (and captured entry IDs) for non-dry run
-            if (asText.includes('[WI] --- BUILDING PROMPT ---') && !stwiiDryRunActive && Array.isArray(stwiiCurrentLoopCounts)) {
-                chat_metadata.stwiiLastLoopCounts = [...stwiiCurrentLoopCounts];
-                if (Array.isArray(stwiiCurrentLoopEntryIds)) {
-                    chat_metadata.stwiiLastLoopEntryIds = stwiiCurrentLoopEntryIds.map(a => Array.isArray(a) ? [...a] : null);
-                }
-            }
-
             // Capture final "Adding N entries to prompt" (ignore "Hypothetically")
             const mAdd = asText.match(/\[\s*WI\s*\]\s+Adding\s+(\d+)\s+entries\s+to\s+prompt\b/i);
             if (mAdd && !stwiiDryRunActive) {
                 const n = Number(mAdd[1]);
-                if (Number.isFinite(n)) chat_metadata.stwiiLastAddedCount = n;
+                if (Number.isSafeInteger(n) && stwiiCurrentBuild) stwiiCurrentBuild.finalCount = n;
             }
         } catch {}
 
@@ -2140,7 +2167,7 @@ function endBuildSession() {
             if (stwiiCurrentBuild && asText) pushBounded(stwiiCurrentBuild.logs, asText, STWII.MAX_BUILD_LOGS);
 
             // Start/end markers
-            if (asText.includes('[WI] --- START WI SCAN') && !stwiiCurrentBuild) startBuildSession();
+            if (asText.includes('[WI] --- START WI SCAN')) startBuildSession(true);
             if (first.includes('--- BUILDING PROMPT ---') && !stwiiCurrentBuild) startBuildSession();
             if (first.includes('--- DONE ---')) endBuildSession();
 
@@ -2189,26 +2216,11 @@ function endBuildSession() {
                 }
             }
 
-            // On BUILDING PROMPT, finalize loop counts (and captured entry IDs) for non-dry run
-            if (asText.includes('[WI] --- BUILDING PROMPT ---') && !stwiiDryRunActive && Array.isArray(stwiiCurrentLoopCounts)) {
-                chat_metadata.stwiiLastLoopCounts = [...stwiiCurrentLoopCounts];
-                // Prefer ids captured via LOOP START/RESULT + activation commits; fallback to ids captured from success-line arrays
-                let finalIds = null;
-                if (Array.isArray(stwiiCurrentLoopEventIds) && stwiiCurrentLoopEventIds.some(a => Array.isArray(a) && a.length)) {
-                    finalIds = stwiiCurrentLoopEventIds.map(a => Array.isArray(a) ? [...a] : null);
-                } else if (Array.isArray(stwiiCurrentLoopEntryIds)) {
-                    finalIds = stwiiCurrentLoopEntryIds.map(a => Array.isArray(a) ? [...a] : null);
-                }
-                if (finalIds) {
-                    chat_metadata.stwiiLastLoopEntryIds = finalIds;
-                }
-            }
-
             // Capture final "Adding N entries to prompt" (ignore "Hypothetically")
             const mAdd = asText.match(/\[\s*WI\s*\]\s+Adding\s+(\d+)\s+entries\s+to\s+prompt\b/i);
             if (mAdd && !stwiiDryRunActive) {
                 const n = Number(mAdd[1]);
-                if (Number.isFinite(n)) chat_metadata.stwiiLastAddedCount = n;
+                if (Number.isSafeInteger(n) && stwiiCurrentBuild) stwiiCurrentBuild.finalCount = n;
             }
         } catch {}
 
@@ -2256,6 +2268,9 @@ window.STWII.destroy = function() {
     tokenSummaryPending = -1;
     realGenerationInProgress = false;
     pendingEntries = [];
+    lastLiveReport = null;
+    lastReportBuild = null;
+    stwiiCurrentBuild = null;
     badgeToken++;
     // New completion hooks have explicit teardown; no lingering token work.
     try {
@@ -2314,10 +2329,9 @@ window.STWII.destroy = function() {
         returns: wiT('command.report.returns'),
         helpString: wiT('command.report.help'),
         callback: async () => {
-            // Prefer the confirmed compact report; legacy logs remain readable.
+            // Prefer the current RAM report even if its saved copy was capped.
             const compact = chat_metadata.stwiiLastReport;
-            const freshMemory = lastReportBuild?.chatId === getCurrentChatId()
-                && lastReportBuild?.runId === compact?.runId ? lastReportBuild : null;
+            const freshMemory = lastLiveReport?.chatId === getCurrentChatId() ? lastLiveReport : null;
             const legacyBuild = Array.isArray(chat_metadata.stwiiBuilds) ? chat_metadata.stwiiBuilds.at(-1) : null;
             const lastBuild = freshMemory || compact || legacyBuild;
             let events = [];
@@ -2561,6 +2575,12 @@ window.STWII.destroy = function() {
                 ? wiT('report.summary', addedCount, sorted.length)
                 : wiT('report.empty');
             container.append(summary);
+            if (lastBuild?.truncated || lastBuild?.incomplete) {
+                const notice = document.createElement('div');
+                notice.classList.add('stwii-report-summary');
+                notice.textContent = wiT(lastBuild.incomplete ? 'report.incomplete' : 'report.truncated');
+                container.append(notice);
+            }
 
             // Loop breakdown (from latest non-dry run)
             // Show counts after applying hidden-book filtering

@@ -10,7 +10,7 @@ This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasak
 
 ## Start here — WorldInfo Info in five minutes
 
-**Current version: 1.7.1-ambasa.6.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+**Current version: 1.7.1-ambasa.7.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
@@ -156,6 +156,8 @@ If the manager is absent, disabled, incompatible, or cannot open the entry, the 
 
 The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches, occurrence counts, and recursion rounds. This version continues to provide this report; activation records are kept compact, and hidden-book filtering is retained for the report and its visible counts.
 
+The latest successfully captured report is saved with the chat (up to 64 KiB of UTF-8 JSON); oversized reports remain complete in the current session, and shortened saved reports are marked. Legacy diagnostic logs and duplicate recursion metadata are retired automatically after a verified scan, using the usual chat save. Incomplete captures leave previous saved data untouched. No cleanup command or background file scan is needed.
+
 A report with no recorded keyword is not proof that a lore entry was never activated; entries can activate for other reasons. The report lists keyword counts and associated entries, with a per-recursion-round breakdown. Jev is a recall source, not a keyword hit. Hidden-lorebook rules are respected for non-admin users and visible report counts.
 
 **`/wi-report`**  
@@ -173,7 +175,7 @@ The interface follows SillyTavern's language setting. English, Korean, Japanese,
 
 ## 🔀 What’s new?
 
-Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.6.
+Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.7.
 
 **Entry selection**  
 **Original**: Opens the entry in the lorebook editor.  
@@ -228,7 +230,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## 먼저 읽어 보세요 · 처음 사용하는 분을 위한 5분 안내
 
-**현재 버전: 1.7.1-ambasa.6.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
+**현재 버전: 1.7.1-ambasa.7.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
 
 1. 원본과 동시에 켜지 말고 설치·새로고침  → 별도 AI 설정 없이 일반 RP 답변 생성 → 책 버튼 누르기.
 2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
@@ -312,11 +314,13 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 **보고서 상세:** 키워드별 일치 횟수와 관련 항목, 재귀 단계별 발동 수를 확인합니다. Jev는 키워드 빈도에 포함되지 않으며 숨김 로어북과 비관리자 표시 규칙을 보고서에도 적용합니다.
 
+**자동 로그 정리:** 정상 수집된 최신 보고서만 채팅에 최대 64KiB(UTF-8 JSON)까지 저장합니다. 용량 초과 시 현재 세션에서는 전체 보고서를 확인할 수 있고 저장본에는 일부 생략 안내가 표시됩니다. 정상 스캔 후 구버전 상세 로그와 중복 재귀 기록을 기존 채팅 저장 과정에서 자동 정리하며, 수집이 불완전하면 이전 기록을 유지합니다. 별도 명령어 또는 전체 채팅 파일 검사는 필요하지 않습니다.
+
 ### 🔮 Jev 표시 연동
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제 Jev 발동 항목을 🔮로 표시합니다. 양쪽을 업데이트하면 목록·열람창·기록된 재귀 보고서에서 출처를 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
-**안내 기준:** 1.7.1-ambasa.6. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
+**안내 기준:** 1.7.1-ambasa.7. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 

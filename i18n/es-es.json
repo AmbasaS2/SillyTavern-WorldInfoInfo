@@ -57,6 +57,8 @@
   "worldInfoInfo.command.report.done": "Informe de palabras clave abierto.",
   "worldInfoInfo.report.title": "Informe de palabras clave del lore",
   "worldInfoInfo.report.summary": "Entradas insertadas: {0} · Tipos de palabras clave: {1}",
+  "worldInfoInfo.report.truncated": "Se han omitido algunos registros por el límite de almacenamiento. Genera una respuesta para ver el informe actual completo.",
+  "worldInfoInfo.report.incomplete": "La captura de activaciones no se completó. Se conservó el informe guardado anterior.",
   "worldInfoInfo.report.empty": "No hay registros de activación de la última generación.",
   "worldInfoInfo.report.loopSummary": "Bucle {0}: {1} entradas",
   "worldInfoInfo.report.loopTitle": "Bucle {0}",
