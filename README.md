@@ -108,16 +108,37 @@ Right-click the floating book on desktop or long-press it on mobile.
   <a href="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="Settings menu including original text, optional token total and Lorebook Library integration" width="860" /></a>
 </p>
 
-| Setting | What it does | Default |
-|---|---|---|
-| **Group by lorebook** | Groups entries by their source lorebook. | On |
-| **Show in injection order** | Orders entries by insertion position and order rather than title. | On |
-| **Show chat message positions** | With grouping off and injection ordering on, shows intervening chat message positions. | On |
-| **Show injected lore token total** | Shows an approximate total of the injected lore text after generation has finished and the list is opened. | Off |
-| **View original text** | Shows original titles in the list and original titles and bodies in the built-in reader; skips saved-translation lookup. | Off |
-| **Link Lorebook Library** | Opens the exact entry in the optional Lorebook Manager Library instead of the built-in reader when available. | Off |
-| **Allow dragging the book button** | Lets you move the floating book. | Off |
-| **Reset book button position** | Returns the floating book to its original position. | Action |
+**Group by lorebook**  
+Groups entries by their source lorebook.  
+**Default**: On
+
+**Show in injection order**  
+Orders entries by insertion position and order rather than title.  
+**Default**: On
+
+**Show chat message positions**  
+With grouping off and injection ordering on, shows intervening chat message positions.  
+**Default**: On
+
+**Show injected lore token total**  
+Shows an approximate total of the injected lore text after generation has finished and the list is opened.  
+**Default**: Off
+
+**View original text**  
+Shows original titles in the list and original titles and bodies in the built-in reader; skips saved-translation lookup.  
+**Default**: Off
+
+**Link Lorebook Library**  
+Opens the exact entry in the optional Lorebook Manager Library instead of the built-in reader when available.  
+**Default**: Off
+
+**Allow dragging the book button**  
+Lets you move the floating book.  
+**Default**: Off
+
+**Reset book button position**  
+Returns the floating book to its original position.  
+**Default**: Action
 
 ### 🧮 Optional Token Total
 
@@ -137,11 +158,14 @@ The `/wi-report` command from aikohanasaki's fork shows recorded keyword matches
 
 A report with no recorded keyword is not proof that a lore entry was never activated; entries can activate for other reasons. The report lists keyword counts and associated entries, with a per-recursion-round breakdown. Jev is a recall source, not a keyword hit. Hidden-lorebook rules are respected for non-admin users and visible report counts.
 
-| Command | Function |
-|---|---|
-| `/wi-report` | Open the lore keyword and recursion report. |
-| `/wi-triggered` | Return the last displayed entry list as JSON. |
-| `/wi-position-reset` | Reset the floating book position. |
+**`/wi-report`**  
+Open the lore keyword and recursion report.
+
+**`/wi-triggered`**  
+Return the last displayed entry list as JSON.
+
+**`/wi-position-reset`**  
+Reset the floating book position.
 
 ## 🌍 Interface Languages
 
@@ -151,15 +175,33 @@ The interface follows SillyTavern's language setting. English, Korean, Japanese,
 
 Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.6.
 
-| Area | Original | Current version |
-|---|---|---|
-| Entry selection | Opens the entry in the lorebook editor. | Opens a floating, read-only Markdown reader by default. |
-| Activation information | Existing strategy icons and detailed keyword/recursion report. | Keeps them and adds recorded activation reasons inside the reader. |
-| Translations | Existing lorebook entry navigation. | Reads supported saved translations in the floating reader. |
-| List lifecycle | Existing activated-entry list. | Ignores non-visible generations and verifies outlet text against the assembled request. |
-| Token estimate | Not included in its settings. | Optional on-demand lore-only total. |
-| Navigation | Opens the native lorebook editor. | Optional exact-entry navigation to the independent Lorebook Library. |
-| Controls and display | Floating button, grouping, ordering, dragging and reset. | Keeps those controls; adds mobile long-press settings, localized UI and viewport-safe themed panels. |
+**Entry selection**  
+**Original**: Opens the entry in the lorebook editor.  
+**Current version**: Opens a floating, read-only Markdown reader by default.
+
+**Activation information**  
+**Original**: Existing strategy icons and detailed keyword/recursion report.  
+**Current version**: Keeps them and adds recorded activation reasons inside the reader.
+
+**Translations**  
+**Original**: Existing lorebook entry navigation.  
+**Current version**: Reads supported saved translations in the floating reader.
+
+**List lifecycle**  
+**Original**: Existing activated-entry list.  
+**Current version**: Ignores non-visible generations and verifies outlet text against the assembled request.
+
+**Token estimate**  
+**Original**: Not included in its settings.  
+**Current version**: Optional on-demand lore-only total.
+
+**Navigation**  
+**Original**: Opens the native lorebook editor.  
+**Current version**: Optional exact-entry navigation to the independent Lorebook Library.
+
+**Controls and display**  
+**Original**: Floating button, grouping, ordering, dragging and reset.  
+**Current version**: Keeps those controls; adds mobile long-press settings, localized UI and viewport-safe themed panels.
 
 This fork focuses on reading and inspecting lore directly during RP. The original keyword/recursion report and floating list remain central to this fork.
 
@@ -238,16 +280,29 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="설정 화면 / Settings" width="860" /></p>
 
-| 설정 | 기본값 / 설명 |
-|---|---|
-| 로어북별로 묶기 | 켜짐. 책별로 표시 |
-| 주입 순서대로 표시 | 켜짐. 끄면 제목순 |
-| 대화 메시지 위치 표시 | 켜짐. 책별 묶기를 끄고 주입 순서를 켰을 때 표시 |
-| 주입 로어 토큰 합계 표시 | 꺼짐. 답변 후 목록을 열 때만 로어 텍스트의 대략적 토큰 계산 |
-| 원문으로 보기 (View original text) | 꺼짐. 목록 제목과 기본 열람창 제목·본문을 원문으로 표시하며 번역 조회를 생략 |
-| 로어북 서가 연동 | 꺼짐. 로어북 매니저 호환 포크에서 정확한 항목으로 이동 |
-| 책 버튼 드래그 허용 | 꺼짐. 위치 이동 시만 켜기 |
-| 책 버튼 위치 초기화 | 원래 위치로 복귀 |
+**로어북별로 묶기**  
+켜짐. 책별로 표시
+
+**주입 순서대로 표시**  
+켜짐. 끄면 제목순
+
+**대화 메시지 위치 표시**  
+켜짐. 책별 묶기를 끄고 주입 순서를 켰을 때 표시
+
+**주입 로어 토큰 합계 표시**  
+꺼짐. 답변 후 목록을 열 때만 로어 텍스트의 대략적 토큰 계산
+
+**원문으로 보기 (View original text)**  
+꺼짐. 목록 제목과 기본 열람창 제목·본문을 원문으로 표시하며 번역 조회를 생략
+
+**로어북 서가 연동**  
+꺼짐. 로어북 매니저 호환 포크에서 정확한 항목으로 이동
+
+**책 버튼 드래그 허용**  
+꺼짐. 위치 이동 시만 켜기
+
+**책 버튼 위치 초기화**  
+원래 위치로 복귀
 
 로어북 서가 연동에 실패하거나 호환 확장이 없으면 기본 열람창을 엽니다. 번역기나 서재 확장은 필수가 아닙니다.
 
