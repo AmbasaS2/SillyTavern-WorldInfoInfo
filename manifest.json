@@ -1,13 +1,13 @@
 {
-    "display_name": "WorldInfo Info",
+    "display_name": "WorldInfo Info: Insight",
     "loading_order": 100,
     "requires": [],
     "optional": [],
     "js": "index.js",
     "css": "style.css",
     "author": "aikohanasaki",
-    "version": "1.7.1-ambasa.7",
-    "homePage": "https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo",
+    "version": "1.7.1-ambasa.8",
+    "homePage": "https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo",
     "description": "Display world information such as title, lorebook, and activation strategy in the chat interface.",
     "i18n": {
         "ko": "i18n/ko-kr.json",

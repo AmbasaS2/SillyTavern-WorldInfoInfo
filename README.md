@@ -1,10 +1,10 @@
-# 📚 WorldInfo Info
+# 📚 WorldInfo Info: Insight
 
-**WorldInfo Info is a SillyTavern extension for inspecting the lorebook entries activated for the current roleplay reply, reading their contents, and checking recorded activation reasons without leaving the chat.**
+**WorldInfo Info: Insight is a SillyTavern extension for inspecting the lorebook entries activated for the current roleplay reply, reading their contents, and checking recorded activation reasons without leaving the chat.**
 
 This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), itself based on [LenAnderson's original WorldInfo Info](https://github.com/LenAnderson/SillyTavern-WorldInfoInfo). The floating book, activation list and keyword/recursion report are the work this fork builds upon. Thank you to both authors for making this workflow possible.
 
-[한국어 안내 ↓](#-월드인포인포)
+[한국어 안내 ↓](#-월드인포인포-인사이트)
 
 **Use this when you want to inspect what lore was activated, not change what is injected.**
 
@@ -27,7 +27,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.7.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+**Current version: 1.7.1-ambasa.8.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
 
 <details>
 <summary>View the workflow</summary>
@@ -92,7 +92,7 @@ This is a read-only integration, not a translation engine. It does not start AI 
 
 ### 3. Optional book-button settings
 
-Right-click the floating book on desktop or long-press it on mobile.
+Right-click the floating book on desktop or long-press it on mobile. Both the entry list and settings panel align their top edge with the book whenever the viewport allows.
 
 <p align="center">
   <a href="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="Settings menu including original text, optional token total and Lorebook Library integration" width="860" /></a>
@@ -138,7 +138,7 @@ No token-counting work is started during generation or streaming. The total is n
 
 ### 📚 Optional Lorebook Library Integration
 
-Enable **Link Lorebook Library** to open an entry in the independent floating library provided by [Lorebook Manager fork](https://github.com/AmbasaS2/lore-manager) v1.4.85-ambasa.65 or later. Matching uses the lorebook name and entry UID, not its displayed or translated title.
+Enable **Link Lorebook Library** to open an entry in the independent floating library provided by [Lorebook Manager: Reading Nook](https://github.com/AmbasaS2/lore-manager) v1.4.85-ambasa.65 or later. Matching uses the lorebook name and entry UID, not its displayed or translated title.
 
 If the manager is absent, disabled, incompatible, or cannot open the entry, the built-in read-only reader opens instead. Leave this option off if you prefer the quick viewer and activation explanation. The setting changes navigation only, not lorebook contents, translation data, or prompt injection.
 
@@ -165,7 +165,7 @@ The interface follows SillyTavern's language setting. English, Korean, Japanese,
 
 ## 🔀 What’s new?
 
-Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.7.
+Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.8.
 
 **Entry selection**  
 **Original**: Opens the entry in the lorebook editor.  
@@ -207,13 +207,13 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 
 Compatible STLO marks actual Jev activation without a second request. Compatible Lorebook Manager reads saved translations and optionally opens the exact entry by book name and UID. Memory Books is not required to inspect Jev or any other lore.
 
-[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+[Lorebook Ordering: Curator](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
 ### 🔮 Jev Recall via STLO
 
-With the compatible [ST Lorebook Ordering (STLO) fork](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
+With the compatible [Lorebook Ordering: Curator](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
 
 This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
 
@@ -223,7 +223,9 @@ WorldInfo Info uses STLO's existing selection and the final World Info activatio
 
 ---
 
-# 📚 월드인포인포
+<a id="-월드인포인포"></a>
+
+# 📚 월드인포인포 인사이트
 
 **이번 RP에 어떤 로어가 불러와졌는지 채팅 화면에서 바로 확인하는 확장입니다.** 로어를 새로 만들거나 주입 여부를 결정하는 확장이 아닙니다.
 
@@ -245,7 +247,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.7.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
+**현재 버전: 1.7.1-ambasa.8.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
 
 1. 원본과 동시에 켜지 말고 설치·새로고침  → 별도 AI 설정 없이 일반 RP 답변 생성 → 책 버튼 누르기.
 2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
@@ -297,7 +299,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 ### 3. 설정하기
 
-책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다.
+책 버튼을 PC에서 우클릭하거나 모바일에서 길게 누릅니다. 목록과 설정창 모두 화면 공간이 허용하는 한 책 버튼의 윗선에 맞춰 열립니다.
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-settings-guide-mobile.svg" alt="설정 화면 / Settings" width="860" /></p>
 
@@ -339,7 +341,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 호환 STLO의 실제 Jev 결과를 추가 요청 없이 표시합니다. 호환 로어북 매니저의 저장 번역을 읽거나 책 이름과 UID로 정확한 서재 항목을 엽니다. 메모리북은 Jev 표시나 일반 로어 확인에 필수가 아닙니다.
 
-[STLO](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager / 로어북 매니저](https://github.com/AmbasaS2/lore-manager) · [Memory Books / 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+[Lorebook Ordering: Curator](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Lorebook Manager: Reading Nook / 로어북 매니저 리딩 누크](https://github.com/AmbasaS2/lore-manager) · [Memory Books: Sloth / 게으름뱅이 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
@@ -347,7 +349,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제 Jev 발동 항목을 🔮로 표시합니다. 양쪽을 업데이트하면 목록·열람창·기록된 재귀 보고서에서 출처를 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
-**안내 기준:** 1.7.1-ambasa.7. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
+**안내 기준:** 1.7.1-ambasa.8. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 

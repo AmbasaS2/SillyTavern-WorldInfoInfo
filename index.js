@@ -985,10 +985,9 @@ const init = ()=>{
             : left >= bounds.left + margin ? left
             : clamp(right, bounds.left + margin, bounds.right - pw - margin);
 
-        // Restore top alignment for the injected-entry list. Keep the settings
-        // panel's existing centering and clamp both to the visible viewport.
-        const y = clamp(el === panel ? tr.top : tr.top + (tr.height - ph) / 2,
-            bounds.top + margin, bounds.bottom - ph - margin);
+        // Align both the lore list and the settings menu to the book's top.
+        // Clamp only when the complete panel would leave the visible viewport.
+        const y = clamp(tr.top, bounds.top + margin, bounds.bottom - ph - margin);
 
         el.style.position = 'fixed';
         el.style.left = x + 'px';
