@@ -41,6 +41,7 @@
   "worldInfoInfo.reader.reason.keyword": "キーワード一致",
   "worldInfoInfo.reader.reason.vector": "ベクトル検索",
   "worldInfoInfo.reader.reason.constant": "常時挿入",
+  "worldInfoInfo.reader.route.outlet": "アウトレット経由",
   "worldInfoInfo.reader.reason.jev": "Jev の記憶呼び出し",
   "worldInfoInfo.reader.reason.sticky": "Sticky継続",
   "worldInfoInfo.reader.reason.external": "外部からの有効化",

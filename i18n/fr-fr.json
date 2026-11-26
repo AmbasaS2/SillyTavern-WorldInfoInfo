@@ -41,6 +41,7 @@
   "worldInfoInfo.reader.reason.keyword": "Mot-clé correspondant",
   "worldInfoInfo.reader.reason.vector": "Recherche vectorielle",
   "worldInfoInfo.reader.reason.constant": "Activation constante",
+  "worldInfoInfo.reader.route.outlet": "Via Outlet",
   "worldInfoInfo.reader.reason.jev": "Rappel de mémoire par Jev",
   "worldInfoInfo.reader.reason.sticky": "Maintien Sticky",
   "worldInfoInfo.reader.reason.external": "Activation externe",

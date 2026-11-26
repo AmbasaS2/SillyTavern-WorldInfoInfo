@@ -68,6 +68,7 @@ const WI_UI_EN = {
     "reader.reason.external": "External activation",
     "reader.reason.decorator": "@@activate directive",
     "reader.reason.secondary": "Secondary condition",
+    "reader.route.outlet": "Via outlet",
     "command.triggered.returns": "last displayed lore entries as JSON",
     "command.triggered.help": "Return the lore entries shown for the last visible generation. Usage: /wi-triggered",
     "command.reset.returns": "resets the book button position",
@@ -400,12 +401,16 @@ function matchLoreReaderChatTypography(dialog, body) {
 }
 
 
+// Keep verification on the displayed snapshot, not in saved lore data.
+const confirmedOutletEntries = new WeakSet();
+
 // Explain the most recent confirmed activation using the already-captured
 // compact /wi-report event. Do not rescan lore, query vectors, or parse logs
 // when the reader opens. A missing event is not evidence of vector activation.
 function describeLoreActivation(entry) {
+    const outletSuffix = confirmedOutletEntries.has(entry) ? ' · ' + wiT('reader.route.outlet') : '';
     // Jev evidence belongs to this displayed entry, not the saved constant flag.
-    if (entry?.stwiiJevRecall === true) return '🔮 ' + wiT('reader.reason.jev');
+    if (entry?.stwiiJevRecall === true) return '🔮 ' + wiT('reader.reason.jev') + outletSuffix;
     const events = chat_metadata.stwiiLastReport?.added;
     const ev = Array.isArray(events) ? events.find(item =>
         item?.world === entry?.world && Number(item.uid) === Number(entry?.uid)) : null;
@@ -430,7 +435,7 @@ function describeLoreActivation(entry) {
             causes.push('⚡ ' + wiT('reader.reason.external'));
         }
     }
-    return causes.length ? causes.join(' + ') : '❔ ' + wiT('reader.reason.unknown');
+    return (causes.length ? causes.join(' + ') : '❔ ' + wiT('reader.reason.unknown')) + outletSuffix;
 }
 
 // Evaluate the option and the bridge only on an actual entry click.
@@ -683,6 +688,7 @@ function confirmedWiEntries(entryList, generationData) {
     const finalPrompt = parts.join('\n').replace(/\s+/g, ' ').trim();
 
     return entryList.filter(entry => {
+        confirmedOutletEntries.delete(entry);
         // SillyTavern has already applied probability, budget, group and activation rules
         // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
         // 'No active entries' for ordinary (non-outlet) entries.
@@ -694,10 +700,12 @@ function confirmedWiEntries(entryList, generationData) {
         // by the preset. Only include one if its text actually reaches the request.
         if (!finalPrompt) return false;
         const candidates = [rendered, String(entry.content ?? '')];
-        return candidates.some(text => {
+        const matched = candidates.some(text => {
             const normalized = text.replace(/\s+/g, ' ').trim();
             return normalized.length > 0 && finalPrompt.includes(normalized);
         });
+        if (matched) confirmedOutletEntries.add(entry);
+        return matched;
     });
 }
 

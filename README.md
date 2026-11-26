@@ -10,7 +10,7 @@ This is a fork of [aikohanasaki's WorldInfo Info](https://github.com/aikohanasak
 
 ## Start here — WorldInfo Info in five minutes
 
-**Current version: 1.7.1-ambasa.5.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
+**Current version: 1.7.1-ambasa.6.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
@@ -76,7 +76,7 @@ Select an entry in the list to open a floating reader rather than navigate away 
 - Drag the reader by its header; desktop and mobile reader positions are remembered separately.
 - The reader loads the current lorebook entry when opened. It does not edit the lorebook or reconstruct an exact historical copy of the request.
 
-The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation.
+The strategy icon in the list represents the configured activation strategy, not necessarily the actual reason an entry was activated on that generation. If the existing outlet text check passes, the reader appends **Via outlet** to the recorded cause (e.g. Always active · Via outlet). This describes the insertion route, not a separate activation cause. Matching text may also occur elsewhere, and transformed text may fail to match.
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="Configured strategy vs recorded activation reason / 설정과 발동 이유" width="860" /></p>
 
@@ -149,7 +149,7 @@ The interface follows SillyTavern's language setting. English, Korean, Japanese,
 
 ## 🔀 What’s new?
 
-Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.5.
+Compared with [aikohanasaki's WorldInfo Info v1.7.0](https://github.com/aikohanasaki/SillyTavern-WorldInfoInfo), the following changes are included in v1.7.1-ambasa.6.
 
 | Area | Original | Current version |
 |---|---|---|
@@ -186,7 +186,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## 먼저 읽어 보세요 · 처음 사용하는 분을 위한 5분 안내
 
-**현재 버전: 1.7.1-ambasa.5.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
+**현재 버전: 1.7.1-ambasa.6.** 캐릭터가 왜 그 설정을 기억했는지 궁금할 때, 최근 일반 RP에서 추적된 활성 로어와 발동 이유를 확인합니다. 로어를 새로 호출하는 확장이 아니며 별도 AI나 다른 확장 없이 사용할 수 있습니다.
 
 1. 원본과 동시에 켜지 말고 설치·새로고침  → 별도 AI 설정 없이 일반 RP 답변 생성 → 책 버튼 누르기.
 2. 항목을 눌러 현재 저장 본문과 기록된 발동 이유를 읽습니다. 설정상 발동 방식과 실제 원인은 다를 수 있습니다.
@@ -224,7 +224,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-reader-mobile.svg" alt="Original and saved translation shown vertically / 원문과 저장 번역문" width="760" /></p>
 
 
-목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다. 벡터 설정이어도 키워드로 발동할 수 있습니다. 키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다.
+목록의 아이콘은 저장된 활성화 방식이고, 열람창의 이유는 이번 답변에서 기록된 발동 원인입니다. 벡터 설정이어도 키워드로 발동할 수 있습니다. 키워드 일치, 보조 조건, 상시 주입, 벡터, Sticky, 외부 활성화, @@activate 등이 표시되며 확인할 수 없는 원인은 확인 불가로 표시합니다. 아웃렛 로어의 본문이 최종 생성 요청에서 확인되면 발동 이유 뒤에 **아웃렛 경유**를 표시합니다(예: 🔵 상시 주입 · 아웃렛 경유). 아웃렛은 별도의 발동 원인이 아닌 주입 경로입니다. 본문 비교 방식이므로 다른 위치에 동일한 문장이 있거나 매크로 등으로 본문이 변형된 경우에는 정확한 경로 판별이 어려울 수 있습니다.
 
 <p align="center"><img src="assets/readme/mobile/worldinfo-info-activation-guide-mobile.svg" alt="설정과 실제 발동 원인 / Activation cause" width="860" /></p>
 
@@ -261,7 +261,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제 Jev 발동 항목을 🔮로 표시합니다. 양쪽을 업데이트하면 목록·열람창·기록된 재귀 보고서에서 출처를 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
-**안내 기준:** 1.7.1-ambasa.5. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
+**안내 기준:** 1.7.1-ambasa.6. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 

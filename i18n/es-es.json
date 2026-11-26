@@ -41,6 +41,7 @@
   "worldInfoInfo.reader.reason.keyword": "Coincidencia de palabra clave",
   "worldInfoInfo.reader.reason.vector": "Búsqueda vectorial",
   "worldInfoInfo.reader.reason.constant": "Activación constante",
+  "worldInfoInfo.reader.route.outlet": "A través de Outlet",
   "worldInfoInfo.reader.reason.jev": "Recuperación de memoria con Jev",
   "worldInfoInfo.reader.reason.sticky": "Continuación Sticky",
   "worldInfoInfo.reader.reason.external": "Activación externa",
