@@ -30,7 +30,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 **Current version: 1.7.1-ambasa.7.** Check which lore actually activated for a normal visible RP reply, what it contains and its recorded activation cause. This is an inspection tool, not a recall engine. No separate AI or other extension is required.
 
 <details>
-<summary>View the illustrated workflow</summary>
+<summary>View the workflow</summary>
 
 <p align="center"><img src="assets/readme/mobile/quickstart-and-integration-mobile.svg" alt="Bilingual mobile quick-start and optional integrations" width="860"></p>
 
@@ -46,7 +46,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 ### 1. Generate a reply and open the book
 
 <details>
-<summary>View the illustrated workflow</summary>
+<summary>View the workflow</summary>
 
 <p align="center">
   <a href="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-workflow-guide-mobile.svg" alt="Generate a reply, open the book, select a lore entry and read an available saved translation" width="860" /></a>
@@ -61,10 +61,8 @@ The number on the book indicates the tracked activated entries. The list can be 
 The list follows the latest visible generation. Dry runs (including token-counting passes) and background quiet generations do not replace it. Ordinary activated entries are shown promptly; outlet entries are included after checking that their text appears in the assembled generation request. This is not a complete token-by-token prompt inspector.
 
 <p align="center">
-  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Illustrated example of the floating book and activated lore list" width="900" /></a>
+  <a href="assets/readme/mobile/worldinfo-info-preview-mobile.svg"><img src="assets/readme/mobile/worldinfo-info-preview-mobile.svg" alt="Floating book and activated lore list" width="900" /></a>
 </p>
-
-*Illustrated UI examples based on the extension's interface, using fictional lore and sample translations. They are not live screenshots.*
 
 ### 2. Select a lore entry to read it
 
@@ -349,7 +347,7 @@ Outlet은 생성 요청에 내용이 들어갔는지 확인합니다.
 
 월드인포인포 1.7.1-ambasa.4와 STLO 2.2.4-ambasa.1부터 실제 Jev 발동 항목을 🔮로 표시합니다. 양쪽을 업데이트하면 목록·열람창·기록된 재귀 보고서에서 출처를 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
-**안내 기준:** 1.7.1-ambasa.7. 이미지는 한영 병기 구성 예시입니다. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
+**안내 기준:** 1.7.1-ambasa.7. 최근 로그 처리 수정은 일반 RP 외 콘솔 로그 위치와 미리보기 로그를 보존하기 위한 내부 변경으로 별도 사용자 설정은 필요 없습니다.
 
 ## 🙏 Credits and License
 
