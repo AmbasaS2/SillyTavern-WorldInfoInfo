@@ -143,7 +143,15 @@ test('concurrent native assemblies reuse history IDs without stealing the live r
  const trace=obs.take(liveArray);
  assert.equal(trace.history.get('chatHistory-2').raw,'live memory');
  assert.equal(trace.collectionKnown,true);
+ assert.equal(trace.structure.getCollection()[1].getCollection()[1],liveMessage);
  assert.equal(manager.preparePrompt,original);assert.equal(NativeMessage.fromPromptAsync,originalFrom);
  const {capture,info}=fixture([row(1,4,'live memory',{depth:0,role:0})],[],liveArray,{info:{squashed:true}});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
+
+test('squashing preserves the native break caused by an empty non-system message',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,1,'Real')],nodes=[node('main','main'),node('chatHistory-1','','chatHistory','assistant'),node('worldInfoAfter','Real')];
+ const {capture,info,trace}=fixture(rows,nodes,[req('main'),req('Real')],{info:{squashed:true},trace:{squashed:true}});
  assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
 });
