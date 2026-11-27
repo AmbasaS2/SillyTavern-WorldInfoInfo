@@ -1633,13 +1633,15 @@ const init = ()=>{
     eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);
     eventSource.on(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
     const onGenerationStopped = () => {
+        // Quiet/other extension work may emit a stop with no visible generation.
+        // Preserve the last confirmed reply and its diagnostics in that case.
+        if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         insight.clear();
         insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
         releasePromptTrace();noteBeforeScan=null;
         renderGenerationEntries([]);
-        if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         realGenerationInProgress = false;
         pendingEntries = [];
         tokenGenerationAwaitingEnd = false;
