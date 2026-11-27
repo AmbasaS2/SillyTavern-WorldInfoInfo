@@ -204,18 +204,45 @@ test('quiet starts never claim a visible scan; ambiguous assembly is dropped',()
     context.begin('quiet',{},false);
     assert.deepEqual(calls,['discard capture']);
 });
-test('unscoped quiet completion cannot finish or clear a visible reply',()=>{
+test('unscoped quiet completion cannot finish or clear a visible reply; native global stop releases the confirmed prompt',()=>{
     const calls=[];
     const context=vm.createContext({backgroundOverlap:true,chat:[{is_user:true},{is_user:false}],
-        onCompletedGeneration(){calls.push('complete');},onGenerationStopped(){calls.push('stop');}});
+        onCompletedGeneration(){calls.push('complete');context.backgroundOverlap=false;},onGenerationStopped(){calls.push('stop');}});
     vm.runInContext(extract('    const onUnscopedCompletion = () => {',
         '    eventSource.on(event_types.GENERATION_ENDED, onUnscopedCompletion);')+
         extract('    const onUnscopedStopped = () => {','    eventSource.on(event_types.GENERATION_STOPPED, onUnscopedStopped);')+
         '\nthis.complete=onUnscopedCompletion;this.message=onVisibleMessageReceived;this.stop=onUnscopedStopped;',context);
-    context.complete();context.stop();context.message(0,'normal');context.message(1,'first_message');
+    context.complete();context.message(0,'normal');context.message(1,'first_message');
     assert.deepEqual(calls,[]);
     context.message(1,'normal');
     assert.deepEqual(calls,['complete']);
-    context.backgroundOverlap=false;context.complete();context.stop();
-    assert.deepEqual(calls,['complete','complete','stop']);
+    context.backgroundOverlap=true;
+    context.complete();context.stop();
+    assert.deepEqual(calls,['complete','complete']);
+    assert.equal(context.backgroundOverlap,false);
+});
+
+test('overlapping quiet work followed by native stop releases the real completion wait once, without clearing verified entries',()=>{
+    const calls=[];
+    const context=vm.createContext({
+        backgroundOverlap:true, realGenerationInProgress:false, tokenGenerationAwaitingEnd:true,
+        generationSerial:7, finalizedTokenGeneration:7, noteBeforeScan:'note',
+        releaseWorldInfoConsoleCapture(){calls.push('console');},
+        releasePromptTrace(){calls.push('trace');},
+        insight:{ready(){calls.push('ready');}},
+        syncTokenFooter(){calls.push('footer');},
+        panel:{classList:{contains:()=>true}},
+        scheduleTokenSummary(){calls.push('count');},
+        onGenerationStopped(){throw Error('verified report must not be discarded during overlap');},
+    });
+    vm.runInContext(extract('    const onCompletedGeneration = () => {','    // Only a real assistant message')+
+        extract('    const onUnscopedStopped = () => {','    eventSource.on(event_types.GENERATION_STOPPED, onUnscopedStopped);')+
+        '\nthis.stop=onUnscopedStopped;this.complete=onCompletedGeneration;',context);
+    context.stop();
+    assert.equal(context.tokenGenerationAwaitingEnd,false);
+    assert.equal(context.backgroundOverlap,false);
+    assert.equal(context.finalizedTokenGeneration,7);
+    assert.deepEqual(calls,['console','trace','ready','footer','count']);
+    context.complete();
+    assert.equal(calls.length,5);
 });

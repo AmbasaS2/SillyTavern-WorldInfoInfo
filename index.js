@@ -1640,6 +1640,7 @@ const init = ()=>{
         releaseWorldInfoConsoleCapture();
         releasePromptTrace();noteBeforeScan=null;
         tokenGenerationAwaitingEnd = false;
+        backgroundOverlap = false;
         insight.ready();
         syncTokenFooter();
         if (panel.classList.contains('stwii--isActive')) scheduleTokenSummary();
@@ -1679,7 +1680,12 @@ const init = ()=>{
         syncTokenFooter();
     };
     const onUnscopedStopped = () => {
-        if (!backgroundOverlap) onGenerationStopped();
+        if (!backgroundOverlap) { onGenerationStopped(); return; }
+        // Native stopGeneration stops the shared stream/controller, not just
+        // the quiet request. In overlap we already have a verified visible
+        // prompt; keep that evidence, but release its completion wait. Never
+        // attribute a quiet scan or discard the confirmed report on ambiguity.
+        onCompletedGeneration();
     };
     eventSource.on(event_types.GENERATION_STOPPED, onUnscopedStopped);
 
