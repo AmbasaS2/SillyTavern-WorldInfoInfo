@@ -42,12 +42,27 @@ test('exact structured group confirms ordered full and partial text, not arbitra
 test('mismatched or squashed prompt, duplicate keys, truncation, hidden entries stay unverified',async()=>{
  const {buildStructuredProof,buildInjectionRecords}=await mod();const {capture,info}=fixture();
  assert.equal(buildStructuredProof(capture,{...info,squashed:true}).length,0);
- assert.equal(buildStructuredProof(capture,{...info,messages:[...info.messages].reverse()}).length,0);
+ assert.equal(buildStructuredProof(capture,{...info,messages:[{...info.messages[0],content:'unrelated'},info.messages[1]]}).length,0);
+ assert.equal(buildStructuredProof(capture,{...info,messages:[...info.messages,{...info.messages[0]}]}).length,0);
  capture.rows[1].entry.uid=1;assert.equal(buildStructuredProof(capture,info).length,0);
  assert.equal(buildInjectionRecords(capture,()=>true,true).complete,false);
  capture.rows[1].entry.uid=2;capture.rows[2].entry.world='Hidden';
  assert.equal(buildInjectionRecords(capture,w=>w!=='Hidden',true).complete,false);
  capture.truncated=true;assert.equal(buildStructuredProof(capture,info).length,0);
+});
+
+test('a dedicated lore block survives unrelated message changes and tied activation order',async()=>{
+ const {buildStructuredProof,confirmStructuredProof}=await mod();const {capture,info,first,second}=fixture();
+ capture.rows[0].entry.order=capture.rows[1].entry.order;
+ first.content='<wi>first\nsecond</wi>';
+ const outbound=[{...second,content:'changed unrelated history'},first];
+ const proof=buildStructuredProof(capture,{...info,messages:outbound});
+ assert.equal(proof.length,1);
+ assert.deepEqual([...confirmStructuredProof(proof,outbound).keys()].sort(),['["Book",1]','["Book",2]']);
+ const duplicate=[...outbound,{...first}];
+ assert.equal(buildStructuredProof(capture,{...info,messages:duplicate}).length,0);
+ capture.rows[1].entry.order=1;
+ assert.equal(buildStructuredProof(capture,{...info,messages:outbound}).length,0);
 });
 
 test('format without lore content and altered request cannot prove insertion',async()=>{

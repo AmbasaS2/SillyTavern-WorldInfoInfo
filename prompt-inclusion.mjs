@@ -1,3 +1,5 @@
+import { matchesNativeLoreGroup } from './stlo-metrics-link.mjs';
+
 // Read-only observation of the actual ST 1.19.1 prompt assembly.
 // Preserve native return values, errors and object contents. Never run a macro
 // or tokenizer again to guess provenance; detach all observers at assembly end.
@@ -408,10 +410,8 @@ export function buildTraceEvidence(capture,info,trace){
             if(!Number.isInteger(position))continue;
             const rows=capture.rows.filter(r=>!r.outlet&&r.entry.position===position&&r.text);
             if(!validGroup(rows))continue;
-            const joined=orderRows(rows).reverse().map(row=>row.text).join('\n');
-            const expected=info.formatWorldInfo(joined);
             const candidates=trace.nodes.filter(n=>n.parent===id&&n.id===id);
-            if(candidates.length===1&&typeof expected==='string'&&expected.includes(joined)&&candidates[0].content===expected)
+            if(candidates.length===1&&matchesNativeLoreGroup(rows,candidates[0].content,info.formatWorldInfo))
                 addRows(aligned.byNode.get(candidates[0]),rows,candidates[0].content);
             else if(!candidates.length&&disabled&&!trace.prompts.some(p=>p.id===id&&p.position===1))
                 for(const row of rows)excluded.set(key(row.entry),'preset');
