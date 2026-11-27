@@ -155,3 +155,18 @@ test('squashing preserves the native break caused by an empty non-system message
  const {capture,info,trace}=fixture(rows,nodes,[req('main'),req('Real')],{info:{squashed:true},trace:{squashed:true}});
  assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
 });
+
+test('sparse native preset indices do not erase verified evidence for other prompts',async()=>{
+ const {observePromptAssembly,buildTraceEvidence}=await mod();
+ const manager={serviceSettings:{squash_system_messages:false},getPromptCollection(){return {collection:[]}},preparePrompt(p){return p},setChatCompletion(c){this.messages=c.getMessages();}};
+ const observer=observePromptAssembly(manager,()=>({}),'normal');
+ manager.getPromptCollection('normal');
+ const items=[];
+ items[2]={identifier:'worldInfoAfter',getCollection:()=>[{identifier:'worldInfoAfter',role:'system',content:'Real'}]};
+ const c={getMessages:()=>({getCollection:()=>items}),getChat:()=>[req('Real')]};
+ manager.setChatCompletion(c);
+ const messages=c.getChat(),trace=observer.take(messages);
+ const {capture,info}=fixture([row(1,1,'Real')],[],messages);
+ assert.equal(trace.nodes.length,1);
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
