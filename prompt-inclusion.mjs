@@ -22,7 +22,8 @@ function flatMessages(root,readReceipt=null){
         if(nested!==null&&(!Array.isArray(nested)||nested.length>LIMIT))return null;
         for(const message of nested??[item]){
             if(!message||typeof message.getCollection==='function'||out.length>=LIMIT)return null;
-            if(message.content!=null&&!isText(message.content))return null;
+            if(message.content!=null&&!isText(message.content)&&
+                !(Array.isArray(message.content)&&message.content.length<=LIMIT))return null;
             const content=message.content;
             if((chars+=(content?.length??0))>TRACE_CHARS)return null;
             out.push({parent:nested?item.identifier:null,id:message.identifier,role:message.role,
@@ -152,7 +153,13 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null,
             // don't let the first dry-run completion steal the live trace.
             if(typeof completion.getChat==='function')install(completion,'getChat',original=>function(...args){
                 const result=original.apply(this,args);
-                if(active&&this===completion&&Array.isArray(result))requests.set(result,snapshot);
+                if(active&&this===completion&&Array.isArray(result)&&result.length<=LIMIT){
+                    // Prompt-ready handlers can change unrelated messages.
+                    // Keep the native placement and its original object.
+                    const originals=result.slice();
+                    const messages=originals.map(message=>({role:message?.role,name:message?.name,content:message?.content}));
+                    requests.set(result,{...snapshot,originals,messages});
+                }
                 return result;
             });
         });
@@ -441,39 +448,4 @@ export function buildTraceEvidence(capture,info,trace){
         }
         return {blocks,excluded};
     }catch{return {blocks:[],excluded:new Map()};}
-}
-
-// An observed loaded entry may have been skipped. Keep only bounded title/key
-// metadata, never the body of nonactivated entries or another book load.
-export function collectNonactivated(lists,activated,observedReasons,limit=256){
-    const rows=[],seen=new Set(activated.map(key));let examined=0,limited=false;
-    if(!lists)return {rows,limited};
-    for(const name of ['globalLore','characterLore','chatLore','personaLore']){
-        const list=lists[name];if(!Array.isArray(list))continue;
-        for(const entry of list){
-            if(++examined>LIMIT){limited=true;return {rows,limited};}
-            if(!entry||!isText(entry.world)||entry.uid==null)continue;
-            const id=key(entry);if(seen.has(id))continue;seen.add(id);
-            if(rows.length>=limit){limited=true;return {rows,limited};}
-            rows.push({entry:{world:entry.world,uid:entry.uid,comment:String(entry.comment??'').slice(0,512),
-                key:Array.isArray(entry.key)?entry.key.slice(0,8).map(k=>String(k).slice(0,100)):[]},
-                reason:observedReasons?.get(id)??'notRecorded'});
-        }
-    }
-    return {rows,limited};
-}
-
-export function scanSkipReason(message){
-    if(message==='disabled')return 'disabled';
-    if(message.startsWith('skipped by generation type trigger filter'))return 'trigger';
-    if(message==='filtered out by character')return 'character';
-    if(message==='filtered out by tag')return 'tag';
-    if(message==='suppressed by delay')return 'delay';
-    if(message==='suppressed by cooldown')return 'cooldown';
-    if(message.startsWith('suppressed by delay until recursion')||message==='suppressed by exclude recursion')return 'recursion';
-    if(message==='suppressed by @@dont_activate decorator')return 'decorator';
-    if(message==='has no keys defined, skipped')return 'noKeys';
-    if(message==='skipped. Secondary keywords not satisfied')return 'secondary';
-    if(/^WI entry \d+ failed probability check, removing from activated entries$/.test(message))return 'probability';
-    return null;
 }

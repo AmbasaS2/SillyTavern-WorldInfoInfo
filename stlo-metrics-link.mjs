@@ -114,15 +114,20 @@ export function buildStructuredProof(capture,info){
     return result;
 }
 
-export function confirmStructuredProof(blocks,messages){
+export function confirmStructuredProof(blocks,messages,correlatedOriginals=null){
     const proven=new Map();
     if(!Array.isArray(messages)||messages.length>4096)return proven;
     for(const block of blocks){
-        // A surviving identical object with unchanged text and role is proof
-        // that the dedicated, fully reconstructed WI block is in this request.
-        if(messages.filter(m=>m===block.message).length!==1)continue;
-        const m=block.message;
-        if(m.content!==block.text||m.role!==block.role||(m.name||'')!==block.name)continue;
+        const exact=m=>m?.content===block.text&&m.role===block.role&&(m.name||'')===block.name;
+        const identical=messages.filter(m=>m===block.message);
+        let m=identical.length===1&&exact(block.message)?block.message:null;
+        // A native block may survive as a unique exact copy in the same
+        // request, even when another handler copies every message object.
+        if(!m&&identical.length===0&&correlatedOriginals?.filter(exact).length===1){
+            const copies=messages.filter(exact);
+            if(copies.length===1)m=copies[0];
+        }
+        if(!m)continue;
         if(typeof m.content!=='string')continue;
         const normalized=m.content.replace(/\s+/g,' ').trim();
         for(const entry of block.entries){

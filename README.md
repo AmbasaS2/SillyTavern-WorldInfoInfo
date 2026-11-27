@@ -32,7 +32,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 **Current version: 1.7.1-ambasa.14.**
 
-.14 fixes missing verified entries caused by concurrent prompt assemblies, sparse preset slots and complex depth/outlet routing. The book still lists only verified insertions; Lore Insight separates activated-but-omitted, unverified and nonactivated entries.
+.14 fixes missing verified entries caused by concurrent prompt assemblies, sparse preset slots and complex depth/outlet routing. The book still lists only verified insertions; Lore Insight shows verified insertions and verified omissions from the activation list.
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
@@ -165,16 +165,13 @@ Right-click the book (long-press on mobile) → **View Lore Insight**. You can o
 
 **Why is a lore missing from the book list?**
 
-<p align="left"><img src="assets/readme/mobile/ui-lore-insight-details.svg" alt="로어 인사이트 상세 / Lore Insight diagnostics" width="480" /></p>
 
 | Section | What it means |
 | --- | --- |
 | Inserted lore | Insertion verified in the correlated pre-send Chat Completion request |
 | Activated but not inserted | An observed omission, such as a disabled preset section or a block omitted during assembly |
-| Unverified insertion | The insertion route or final evidence could not be established; a text match, missing text, or overlapping text is not proof |
-| Not activated | Nonactivation information actually observed, e.g. disabled, character/trigger restrictions, cooldown, delay, secondary conditions or probability |
 
-Click an underlined term or a reason icon for its explanation. The nonactivation list is bounded and is not a complete audit of every lorebook entry. Unknown is not the same as excluded.
+Click an underlined term or a reason icon for its explanation. Entries with an unconfirmed outcome contribute only to the uncertainty count.
 
 > [!NOTE]
 > This is a read-only estimate of the host request observed immediately before sending, not the provider's final bill. Later transformations and unsupported/unproven routes cannot be verified. Hidden lore is excluded for users without access; the overall share is omitted when visibility is incomplete. Missing measurements are not zero. Closing the window stops further scheduled counting; new generation/chat or incompatible tokenizer context invalidates old measurements.
@@ -193,7 +190,7 @@ Enter `/wi-report` after a reply to open aikohanasaki's original keyword and rec
 
 **What the report does not show**
 
-- A missing recorded keyword is not proof an entry never activated. Use Lore Insight for observed omissions and nonactivation diagnostics.
+- A missing recorded keyword is not proof an entry never activated. Use Lore Insight to see verified omissions from the activation list.
 - Jev is a recall source, not a keyword hit.
 
 **Commands**
@@ -298,7 +295,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 ## 이 확장, 누가 쓰면 좋을까? ✍️(◔◡◔)
 
 - 👀 이번 답변에 어느 로어북의 어떤 항목이 **실제 주입됐는지** 확인하고 싶은 사람
-- 🔎 발동했는데 빠진 로어, 주입을 확인할 수 없는 로어, 발동하지 않은 로어를 구분하고 싶은 사람
+- 🔎 발동한 로어 중에서 실제로 주입된 항목과 미주입이 확인된 항목을 보고 싶은 사람
 - 기본·보조 키워드 일치, 상시 주입, 벡터 검색, Sticky 유지, 외부 활성화, @@activate 등 기록된 실제 발동 이유를 알고 싶은 분
 - 키워드 일치 횟수·재귀 단계·Sticky 남은 횟수·주입 위치와 순서로 예상 밖의 발동 원인을 추적하고 싶은 분
 - 채팅을 벗어나지 않고 마크다운 본문과 이미 저장한 번역을 읽고 싶은 분
@@ -309,7 +306,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 **현재 버전: 1.7.1-ambasa.14.**
 
-.14에서는 동시 프롬프트 조립, 빈 프리셋 슬롯, 복합 깊이·아웃렛 경로에서 실제 주입 항목이 누락되던 문제를 수정했어요. 책에는 실제 주입 확인 항목만 표시하고, 로어 인사이트는 발동 후 미주입·주입 미확인·미발동을 구분합니다.
+.14에서는 동시 프롬프트 조립, 빈 프리셋 슬롯, 복합 깊이·아웃렛 경로에서 실제 주입 항목이 누락되던 문제를 수정했어요. 책에는 실제 주입 확인 항목만 표시하고, 로어 인사이트에는 주입 확인 목록과 발동 후 미주입 확인 목록이 있습니다.
 
 > **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
 >
@@ -333,7 +330,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 - 로어 제목을 누르면 열람창이 열립니다.
 
 > [!NOTE]
-> 토큰 계산용 미리보기나 quiet generation은 목록을 덮어쓰지 않습니다. 발동했다고 무조건 책 목록에 나오는 것은 아니에요. 전송 직전 Chat Completion 요청에서 실제 삽입 경로와 내용이 확인된 항목만 표시합니다. 미주입·미확인·미발동 로어는 로어 인사이트에서 따로 확인하세요.
+> 토큰 계산용 미리보기나 quiet generation은 목록을 덮어쓰지 않습니다. 발동했다고 무조건 책 목록에 나오는 것은 아니에요. 전송 직전 Chat Completion 요청에서 실제 삽입 경로와 내용이 확인된 항목만 표시합니다. 발동한 로어 중 미주입이 확인된 항목은 로어 인사이트에서 볼 수 있어요.
 
 <p align="left"><img src="assets/readme/mobile/ui-activated-lore.svg" alt="확인된 주입 로어 / Verified inserted lore" width="480" /></p>
 
@@ -428,16 +425,13 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 **‘발동했는데 왜 책 목록에 없지?’**
 
-<p align="left"><img src="assets/readme/mobile/ui-lore-insight-details.svg" alt="로어 인사이트 상세 / Lore Insight diagnostics" width="480" /></p>
 
 | 구획 | 뜻 |
 | --- | --- |
 | 주입된 로어 | 전송 직전 요청에서 실제 삽입 확인 |
 | 발동했지만 주입되지 않은 로어 | 프리셋에서 제외되었거나 입력 구성에서 빠진 것이 확인됨 |
-| 주입 여부 미확인 | 같은 본문만 발견했거나 경로를 확인할 증거가 부족함 |
-| 발동하지 않은 로어 | 비활성화·캐릭터 제한·발동 지연·쿨다운 등 실제 기록된 미발동 정보 |
 
-밑줄이 있는 짧은 용어나 발동 아이콘을 누르면 뜻이 펼쳐집니다. **미확인은 미주입이라는 뜻이 아닙니다!** 기록된 미발동 항목만 표시하며 표시 한도도 있어요. 모든 로어의 탈락 이유를 완벽하게 추적하는 기능은 아닙니다.
+밑줄이 있는 짧은 용어나 발동 아이콘을 누르면 뜻이 펼쳐집니다. 주입 여부가 확인되지 않은 항목은 개수로만 알려줘요.
 
 > [!NOTE]
 > 토큰은 전송 직전 실리태번 요청의 확인된 본문에 대한 추정치입니다. 공급자 청구 토큰과는 다르고, 이후 변경되거나 확인되지 않은 경로까지 보장하지 않아요. 숨겨진 로어를 볼 수 없는 경우 전체 비중은 계산하지 않습니다. 미계측은 0이 아닙니다. 창을 닫으면 추가 예정 계산은 멈추고 새 채팅·생성이나 토크나이저 변경 시 예전 계측을 그대로 재사용하지 않습니다.

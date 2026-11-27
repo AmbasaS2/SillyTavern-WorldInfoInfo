@@ -23,7 +23,7 @@ export function createInsightCapture(serial,chatId,observed,scope=null) {
     let chars=0;
     const capture={
         serial,chatId,observed,scope,rows:[],parts:null,source:'assembled',promptLimited:false,truncated:false,measurement:null,
-        nonactivated:[],nonactivatedLimited:false,proven:new Map(),excluded:new Map(),inspection:null,requestProofChecked:false,
+        proven:new Map(),excluded:new Map(),inspection:null,requestProofChecked:false,
         setPrompt(parts,_normalized,source='assembled') {
             capture.source=source;
             capture.parts=boundedParts(parts);
@@ -303,28 +303,37 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         if(capture.observed===null&&!complete){accept(capture);return;}
         if(requestInfo&&typeof watchRequest==='function'){
             const matches=createRequestMatcher(requestInfo.messages,requestInfo.type);
-            const traced=buildTraceEvidence(capture,requestInfo,requestInfo.trace);
+            const native=requestInfo.trace;
+            const proofInfo=native?.messages?{...requestInfo,messages:native.messages}:requestInfo;
+            const traced=buildTraceEvidence(capture,proofInfo,native);
             // The native trace and dedicated collections are independent evidence.
             // A partial trace must not suppress exact dedicated-block proof.
-            const structural=[...traced.blocks,...buildStructuredProof(capture,requestInfo)];
+            const structural=[...traced.blocks,...buildStructuredProof(capture,proofInfo)];
+            if(native?.messages){
+                const origins=new Map(native.messages.map((message,i)=>[message,native.originals[i]]));
+                for(const block of structural)block.message=origins.get(block.message);
+            }
             const assembled=Array.isArray(requestInfo.messages)&&requestInfo.messages.length<=4096?
-                requestInfo.messages.map(message=>({message,content:message?.content,role:message?.role,name:message?.name||''})):null;
+                requestInfo.messages.map(message=>({content:message?.content,role:message?.role,name:message?.name||''})):null;
+            const correlated=new WeakSet();
+            const remember=data=>{if(matches(data))correlated.add(data);};
             try{
                 releaseRequest=watchRequest(data=>{
-                    if(latest!==capture||capture.chatId!==getChatId()||!matches(data))return;
+                    if(latest!==capture||capture.chatId!==getChatId()||
+                        (!correlated.has(data)&&!matches(data)))return;
                     try{
                         capture.setPrompt(requestTextParts(data.messages),null,'request');
                         capture.scope=readScope();
                         {
-                            capture.proven=confirmStructuredProof(structural,data.messages);
+                            capture.proven=confirmStructuredProof(structural,data.messages,correlated.has(data)?assembled:null);
                             capture.requestProofChecked=true;
                             const unchanged=assembled&&data.messages.length===assembled.length&&assembled.every((item,i)=>
-                                data.messages[i]===item.message&&item.message.content===item.content&&item.message.role===item.role&&(item.message.name||'')===item.name);
+                                data.messages[i]?.content===item.content&&data.messages[i].role===item.role&&(data.messages[i].name||'')===item.name);
                             capture.excluded=unchanged?traced.excluded:new Map();
                         }
                     }catch{}
                     stopWatching();accept(capture);
-                });
+                },remember);
                 if(typeof releaseRequest==='function')return;
             }catch{stopWatching();}
         }
@@ -373,7 +382,6 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         const allVisible=rows.length===allRows.length,sameScope=scope!==null&&capture.scope===scope;
         const matched=verifiedInsightRows(capture).filter(r=>isVisible(r.entry.world));
         const matchedSet=new Set(matched),excluded=rows.filter(r=>r.status==='excluded'&&!matchedSet.has(r)),unresolved=rows.filter(r=>!matchedSet.has(r)&&r.status!=='excluded');
-        const nonactivated=capture.nonactivated.filter(r=>isVisible(r.entry.world));
         const visibility=JSON.stringify(rows.map(r=>[r.entry.world,r.entry.uid]));
         const saved=sameScope&&capture.measurement?.scope===scope&&capture.measurement?.visibility===visibility?capture.measurement:null;
         for(const row of rows){
@@ -445,10 +453,10 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             function finish(){copy.append(help);if(selected&&buttons.some(x=>x.key===selected))refreshTerms(selected);}
             return {button,finish};
         }
-        function entrySection(label,key,list,verified,opened,inactive=false){
+        function entrySection(label,key,list,verified,opened){
             const detail=element('details','stwii--insight-section stwii--insight-details');
             detail.dataset.insightSection=key;detail.open=opened.has(key);
-            detail.append(element('summary','',t(label)+' · '+list.length+(inactive&&capture.nonactivatedLimited?'+':'')));
+            detail.append(element('summary','',t(label)+' · '+list.length));
             let built=false;
             function build(){
                 if(built)return;built=true;
@@ -458,19 +466,16 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
                 const term=termControl(copy,key+':'+metricsKey(row.entry));
                 let name=String(row.entry.uid??'');try{name=titleFor(row.entry)||name;}catch{}
                 const heading=element('strong','stwii--insight-entry-heading');
-                const icons=inactive?[]:reasonIcons(row.entry);
+                const icons=reasonIcons(row.entry);
                 for(const {icon,label,key:reason} of icons)
                     heading.append(term.button('reason.'+reason,icon,'stwii--insight-reason-icon',label));
                 heading.append(element('span','stwii--insight-entry-name',name));
                 copy.append(heading,element('small','stwii--insight-entry-meta',String(row.entry.world??'')));
                 const terms=element('div','stwii--insight-terms');
-                if(!inactive&&!icons.length)terms.append(term.button('reason.'+row.reason,reasonLabel(row.reason)));
-                if(!inactive){
-                    for(const item of selectionLabels(row.entry))terms.append(term.button(item.key.slice('insight.'.length),item.label));
-                    if(row.outlet)terms.append(term.button('outlet',t('reader.route.outlet')+(row.entry.outletName?' · '+String(row.entry.outletName):'')));
-                }
-                const evidence=inactive?'skip.'+row.reason:verified?'evidence.verified':
-                    row.status==='excluded'?'excluded.'+row.exclusion:row.status==='matched'?'evidence.textOnly':row.status;
+                if(!icons.length)terms.append(term.button('reason.'+row.reason,reasonLabel(row.reason)));
+                for(const item of selectionLabels(row.entry))terms.append(term.button(item.key.slice('insight.'.length),item.label));
+                if(row.outlet)terms.append(term.button('outlet',t('reader.route.outlet')+(row.entry.outletName?' · '+String(row.entry.outletName):'')));
+                const evidence=verified?'evidence.verified':'excluded.'+row.exclusion;
                 terms.append(term.button(evidence,t('insight.'+evidence)));
                 copy.append(terms);term.finish();line.append(copy);
                 if(verified){
@@ -498,10 +503,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         updateLimit();numberUpdates.push(updateLimit);report.append(limitNote);
         report.append(groupSection(t('insight.books'),r=>String(r.entry.world??''),s=>s),groupSection(t('insight.reasons'),r=>r.reason,reasonLabel));
         report.append(entrySection('insight.entries','matched',matched,true,expanded));
-        if(excluded.length)report.append(entrySection('insight.excluded','excluded',excluded,false,expanded));
-        if(unresolved.length)report.append(entrySection('insight.unresolved','unresolved',unresolved,false,expanded));
-        if(nonactivated.length)report.append(entrySection('insight.nonactivated','nonactivated',nonactivated,false,expanded,true));
-        if(capture.nonactivatedLimited)report.append(element('p','stwii--insight-note',t('insight.nonactivatedLimit')));
+        report.append(entrySection('insight.excluded','excluded',excluded,false,expanded));
         const sameView=()=>current===view&&view.revision===revision&&latest===capture&&getChatId()===capture.chatId;
         const stillCurrent=()=>sameView()&&readScope()===scope;
         function updateStatus(){

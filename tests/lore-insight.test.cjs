@@ -104,6 +104,24 @@ test('message boundaries, duplicate IDs and changed request contents',async()=>{
  assert.equal(cap.source,'request');
  assert.equal(inspectInsight(cap)[1].status,'unmatched');
 });
+
+test('same pre-send request retains native proof across immutable message copies',async()=>{
+ const {createLoreInsight,verifiedInsightRows}=await mod();
+ let observe,finalize,verified=[];
+ const insight=createLoreInsight({getScope:()=> 'scope',getChatId:()=> 'chat',isVisible:()=>true,
+  watchRequest:(after,before)=>{finalize=after;observe=before;return()=>{};}});
+ const lore={role:'system',content:'Native lore.'},chat={role:'user',content:'Conversation.'};
+ const cap=insight.beginCapture(1,'chat',1);cap.add({...entry(1),position:1,order:1},lore.content);
+ const structure={getCollection:()=>[{identifier:'worldInfoAfter',getCollection:()=>[{...lore,identifier:'worldInfoAfter'}]},chat]};
+ insight.finish(cap,true,{messages:[lore,chat],type:'normal',structure,afterPosition:1,formatWorldInfo:s=>s},
+  captured=>{verified=verifiedInsightRows(captured).map(row=>row.entry.uid);});
+ const unrelated={type:'normal',messages:[{...lore},{...chat}]};
+ observe(unrelated);finalize(unrelated);assert.deepEqual(verified,[]);
+ const request={type:'normal',messages:[lore,chat]};
+ observe(request);request.messages=request.messages.map(message=>({...message}));finalize(request);
+ assert.deepEqual(verified,[1]);
+ insight.clear();
+});
 test('oversized request invalidates assembled text evidence rather than falling back silently',async()=>{
  const {createInsightCapture,inspectInsight,requestTextParts}=await mod();
  const cap=createInsightCapture(1,'chat',1);
@@ -184,15 +202,14 @@ test('live dialog publishes only verified request entries before completion and 
   cap.add({...entry(1),position:0,order:1,comment:'Present entry'},'Present.');
   cap.add({...entry(2),position:1,order:2,comment:'Removed entry'},'Absent.');
   cap.add({...entry(3),position:7,comment:'Outlet entry',outletName:'outlet'},'Never present.',true);
-  cap.nonactivated=[{entry:{...entry(4),comment:'Not activated'},reason:'cooldown'}];
   const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...first,identifier:'worldInfoBefore'}]},{identifier:'worldInfoAfter',getCollection:()=>[{...second,identifier:'worldInfoAfter'}]},{identifier:'chatHistory',getCollection:()=>[{...oldChat,identifier:'chatHistory-1'}]}]};
   insight.finish(cap,true,{messages:[first,second,oldChat],type:'normal',structure,beforePosition:0,afterPosition:1,formatWorldInfo:s=>s},c=>finals.push(verifiedInsightRows(c).map(r=>r.entry.uid)));
   assert.match(document.body.textContent,/insight.waiting/);assert.equal(finals.length,0);assert.equal(calls.length,0);
   second.content='Modified.';listener({type:'normal',messages:[first,second,oldChat]});assert.equal(listener,null);
   await tick();assert.deepEqual(finals,[[1]]);assert.ok(calls.includes('Present.\n'));assert.ok(!calls.includes('Absent.\n'));assert.ok(!calls.includes('Never present.\n'));
-  const sections=document.body.walk().filter(x=>x.dataset.insightSection==='matched'||x.dataset.insightSection==='unresolved'||x.dataset.insightSection==='nonactivated');
-  assert.equal(sections.length,3);assert.ok(sections.every(s=>s.childElementCount===1));sections.forEach(expand);assert.match(sections[0].textContent,/Present entry/);assert.doesNotMatch(sections[0].textContent,/Removed entry|Outlet entry|Not activated/);
-  assert.match(sections[1].textContent,/Removed entry/);assert.match(sections[1].textContent,/reader.route.outlet/);assert.match(sections[2].textContent,/Not activated/);assert.match(sections[2].textContent,/insight.skip.cooldown/);assert.match(document.body.textContent,/insight.source.request/);
+  const sections=document.body.walk().filter(x=>['matched','excluded','unresolved','nonactivated'].includes(x.dataset.insightSection));
+  assert.deepEqual(sections.map(x=>x.dataset.insightSection),['matched','excluded']);assert.ok(sections.every(s=>s.childElementCount===1));sections.forEach(expand);assert.match(sections[0].textContent,/Present entry/);assert.doesNotMatch(sections[0].textContent,/Removed entry|Outlet entry|Not activated/);
+  assert.doesNotMatch(sections[1].textContent,/Removed entry|Outlet entry|Not activated/);assert.match(document.body.textContent,/insight.source.request/);
   const count=calls.length;insight.ready();await tick();assert.equal(calls.length,count);
   insight.close();insight.open();await tick();assert.equal(calls.length,count);
   insight.close();insight.start();const next=insight.beginCapture(2,'chat',1);next.setPrompt(['Next.'],null);next.add(entry(9),'Next.');
@@ -233,13 +250,12 @@ test('STLO consumer publishes structural evidence when closed and counts only wh
   insight.open();await tick();
   assert.equal(calls.length,1);assert.equal(local,2);assert.equal(publications.length,2);
   assert.match(insight.selectionFor(a),/adaptive-role/);
-  for(const section of document.body.walk().filter(x=>['matched','unresolved'].includes(x.dataset.insightSection)))expand(section);
+  for(const section of document.body.walk().filter(x=>['matched','excluded'].includes(x.dataset.insightSection)))expand(section);
   assert.match(document.body.textContent,/insight.jev.score/);
   assert.match(document.body.textContent,/insight.evidence.summary/);
   const entries=document.body.walk().filter(x=>x.className==='stwii--insight-entry');
   assert.match(entries.find(x=>x.textContent.includes('Jev scene')).textContent,/insight.evidence.verified/);
-  const depthRow=entries.find(x=>x.textContent.includes('Depth scene'));
-  assert.match(depthRow.textContent,/insight.evidence.textOnly/);
+  assert.equal(entries.some(x=>x.textContent.includes('Depth scene')),false);
   assert.doesNotMatch(document.body.walk().find(x=>x.dataset.insightSection==='matched').textContent,/Depth scene/);
   const jevRow=entries.find(x=>x.textContent.includes('Jev scene'));
   const budget=jevRow.walk().find(x=>x.tagName==='button'&&x.textContent==='insight.jev.accepted');
@@ -290,12 +306,11 @@ test('closed disclosure creates no rows, automatic token updates preserve expand
   insight.start();
   const msg={role:'system',content:'Real.'},cap=insight.beginCapture(1,'chat',1);
   cap.setPrompt(['Real.'],null);cap.add({...entry(1),position:0,order:1,comment:'Real entry'},'Real.');
-  cap.nonactivated=Array.from({length:100},(_,i)=>({entry:{...entry(i+2),comment:'skip '+i},reason:'cooldown'}));
   const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...msg,identifier:'worldInfoBefore'}]}]};
   insight.finish(cap,true,{messages:[msg],type:'normal',structure,beforePosition:0,formatWorldInfo:s=>s});
   listener({type:'normal',messages:[msg]});insight.open();
   const matched=document.body.walk().find(x=>x.dataset.insightSection==='matched');
-  const skipped=document.body.walk().find(x=>x.dataset.insightSection==='nonactivated');
+  const skipped=document.body.walk().find(x=>x.dataset.insightSection==='excluded');
   assert.equal(matched.childElementCount,1);assert.equal(skipped.childElementCount,1);
   expand(matched);const row=matched.children[1],term=row.walk().find(x=>x.tagName==='button'&&x.textContent==='insight.evidence.verified');
   term.handlers.click();await tick();
@@ -303,7 +318,7 @@ test('closed disclosure creates no rows, automatic token updates preserve expand
   assert.equal(matched.children[1],row);assert.equal(skipped.childElementCount,1);
   assert.equal(row.walk().find(x=>x.className==='stwii--insight-entry-tokens').textContent,'~5 T');
   assert.equal(row.walk().find(x=>x.className==='stwii--insight-term-help').hidden,false);
-  expand(skipped);assert.equal(skipped.childElementCount,101);expand(skipped);assert.equal(skipped.childElementCount,101);
+  expand(skipped);assert.equal(skipped.childElementCount,1);
   insight.clear();
  }finally{global.document=old;}
 });
