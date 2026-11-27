@@ -1,8 +1,9 @@
-import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
+import { chat, chat_metadata, event_types, eventSource, main_api, extension_prompts, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
 import { translate as stTranslate, getCurrentLocale } from '../../../i18n.js';
 import { metadata_keys } from '../../../authors-note.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 import { promptManager } from '../../../openai.js';
+import * as insightOpenAI from '../../../openai.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { delay, flashHighlight } from '../../../utils.js';
@@ -16,7 +17,8 @@ import { tryOpenInLoreLibrary } from './lore-library-link.js';
 import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 import { canReplaceReport, persistReport } from './report-storage.js';
-import { createLoreInsight, createInsightTokenCache, insightReason, canShowInsightWorld } from './lore-insight.mjs';
+import { createLoreInsight, createInsightTokenCache, insightReason, insightReasonCodes, canShowInsightWorld, requestTextParts, hasCompleteEvidence, verifiedInsightRows } from './lore-insight.mjs';
+import { observePromptAssembly, collectNonactivated, scanSkipReason } from './prompt-inclusion.mjs';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -45,7 +47,7 @@ const WI_UI_EN = {
     "settings.reset.label": "Reset book button position",
     "settings.reset.hint": "Move the book button back to its default position.",
     "panel.none": "No injected lore entries",
-    "panel.waiting": "No lore entries to show yet",
+    "panel.waiting": "Checking the prompt…",
     "panel.hidden": "(hidden entries)",
     "panel.ungrouped": "Lore entries",
     "entry.note": "Author’s Note",
@@ -96,24 +98,24 @@ const WI_UI_EN = {
     "settings.insight.label": "View Lore Insight",
     "settings.insight.hint": "Inspect the latest RP lore and token estimates.",
     "insight.title": "Lore Insight",
-    "insight.waiting": "Preparing the generation request…",
+    "insight.waiting": "Checking the actual request…",
     "insight.empty": "No captured RP data in this chat. Generate a reply first.",
-    "insight.note": "Confirmed lore means captured text was found in the request; this is evidence, not exact entry provenance or API usage. Repeated, overlapping or missing text is unverified. Outlets can activate without being used. The total estimates combined text; group totals sum individual estimates and can differ slightly.",
+    "insight.note": "Only verified lorebook insertions are counted in the book list and token estimates. Omitted, unverified, and observed nonactivated entries are shown separately. Tap an underlined term to see its meaning. Token counts are estimates; combined and individual totals may differ.",
     "insight.activated": "Activated (visible)",
-    "insight.matched": "Lore found in request",
-    "insight.unresolved": "Unverified lore",
-    "insight.total": "Lore token estimate",
-    "insight.share": "Share of input text",
+    "insight.matched": "Verified injected lore",
+    "insight.unresolved": "Insertion unverified",
+    "insight.total": "Verified lore token estimate",
+    "insight.share": "Verified lore share of input",
     "insight.unmeasured": "Not measured",
-    "insight.unmatched": "Not found in request",
-    "insight.unknown": "Unverified",
-    "insight.ambiguous": "Ambiguous match",
+    "insight.unmatched": "Original text not found",
+    "insight.unknown": "Insufficient evidence",
+    "insight.ambiguous": "Repeated or overlapping text",
     "insight.measure": "Calculate token estimates",
     "insight.counting": "Estimating tokens…",
     "insight.measured": "Token estimates calculated",
     "insight.books": "By lorebook",
     "insight.reasons": "By activation reason",
-    "insight.entries": "Included lore",
+    "insight.entries": "Injected lore",
     "insight.visible": "Hidden lore excluded. Full-prompt ratio is not calculated.",
     "insight.limit": "Capture or detail limit reached. Values may be partial; unmeasured values are not zero.",
     "insight.multiple": "Multiple recorded reasons",
@@ -122,8 +124,76 @@ const WI_UI_EN = {
     "insight.scopeChanged": "Tokenizer or generation context changed. Generate a new reply to measure.",
     "insight.help": "About these estimates",
     "insight.count": "{0} entries",
-    "insight.noMatches": "No lore text confirmed.",
-    "insight.retry": "Retry missing estimates"
+    "insight.noMatches": "No verified injected lore.",
+    "insight.retry": "Retry missing estimates",
+    "insight.jev.source.all": "Jev full assessment",
+    "insight.jev.source.native": "Native search candidate",
+    "insight.jev.source.adaptive-durable": "Durable-memory cue",
+    "insight.jev.source.adaptive-concise": "Short-memory cue",
+    "insight.jev.source.adaptive-role": "Memory-role cue",
+    "insight.jev.source.adaptive-anchors": "Title/key cues",
+    "insight.jev.source.adaptive-recent": "Recent source cue",
+    "insight.jev.score": "Selection score {0}",
+    "insight.evidence.summary": "Omitted: {0} · Unverified: {1}",
+    "insight.evidence.verified": "Insertion confirmed",
+    "insight.evidence.textOnly": "Matching text only",
+    "panel.noneVerified": "No verified injected lore",
+    "insight.excluded": "Activated but not inserted",
+    "insight.nonactivated": "Not activated in this scan",
+    "insight.nonactivatedLimit": "Only a limited number of nonactivated entries are shown.",
+    "insight.excluded.preset": "Disabled preset section",
+    "insight.excluded.context": "Omitted during assembly",
+    "insight.skip.disabled": "Disabled",
+    "insight.skip.trigger": "Generation type filter",
+    "insight.skip.character": "Character filter",
+    "insight.skip.tag": "Tag filter",
+    "insight.skip.delay": "Activation delay",
+    "insight.skip.cooldown": "Cooldown",
+    "insight.skip.recursion": "Recursion restriction",
+    "insight.skip.decorator": "Activation blocked",
+    "insight.skip.noKeys": "No keywords",
+    "insight.skip.secondary": "Secondary condition unmet",
+    "insight.skip.probability": "Probability check failed",
+    "insight.skip.notRecorded": "Reason not recorded",
+    "insight.explain.evidence.verified": "This entry was traced to the actual pre-send request.",
+    "insight.explain.evidence.textOnly": "The same text appears in the request, but its insertion source is unverified.",
+    "insight.explain.unmatched": "The captured original text was not found in the request.",
+    "insight.explain.unknown": "The available request evidence is insufficient to determine insertion.",
+    "insight.explain.ambiguous": "Repeated or overlapping text prevents unique attribution.",
+    "insight.explain.excluded.preset": "The preset's insertion section for this entry is disabled.",
+    "insight.explain.excluded.context": "The observed insertion slot was omitted from the final prompt assembly.",
+    "insight.explain.skip.disabled": "The engine treated the entry as disabled in this scan.",
+    "insight.explain.skip.trigger": "The current generation type does not meet the entry's trigger setting.",
+    "insight.explain.skip.character": "The current character is excluded by the entry's character filter.",
+    "insight.explain.skip.tag": "The current character's tags do not meet the entry's tag filter.",
+    "insight.explain.skip.delay": "The configured activation delay is still in effect.",
+    "insight.explain.skip.cooldown": "The entry is waiting for its configured cooldown to end.",
+    "insight.explain.skip.recursion": "The current recursion step does not meet this entry's settings.",
+    "insight.explain.skip.decorator": "An @@dont_activate directive prevented activation.",
+    "insight.explain.skip.noKeys": "The keyword-based entry has no configured keywords.",
+    "insight.explain.skip.secondary": "The secondary keyword condition was not satisfied.",
+    "insight.explain.skip.probability": "The entry did not pass its configured probability check.",
+    "insight.explain.skip.notRecorded": "The entry was observed in the scan but no specific skip reason was recorded.",
+    "insight.explain.reason.constant": "The engine activated this entry through its always-active setting.",
+    "insight.explain.reason.keyword": "A configured keyword matched the scan text.",
+    "insight.explain.reason.vector": "The vector search returned this entry as a match.",
+    "insight.explain.reason.jev": "Jev selected this memory for the current generation.",
+    "insight.explain.reason.sticky": "A previously activated entry remains active for the configured rounds.",
+    "insight.explain.reason.decorator": "The @@activate directive triggered this entry.",
+    "insight.explain.reason.external": "An external extension or host event activated this entry.",
+    "insight.explain.reason.unknown": "The engine did not record a specific activation reason.",
+    "insight.explain.reason.multiple": "More than one activation reason was observed.",
+    "insight.explain.outlet": "This lore uses an outlet macro as its insertion route.",
+    "insight.explain.jev.source.all": "Jev assessed all eligible memories instead of narrowing them through search.",
+    "insight.explain.jev.source.native": "The host's existing search included this memory among Jev's candidates.",
+    "insight.explain.jev.source.adaptive-durable": "A recorded long-term memory cue included this candidate.",
+    "insight.explain.jev.source.adaptive-concise": "The short-memory rule included this candidate for assessment.",
+    "insight.explain.jev.source.adaptive-role": "The memory's recorded role metadata included this candidate.",
+    "insight.explain.jev.source.adaptive-anchors": "Title or keyword cues from the recent conversation included this candidate.",
+    "insight.explain.jev.source.adaptive-recent": "A recorded recent conversation source included this candidate.",
+    "insight.explain.jev.score": "The inclusion score returned by Jev for this memory.",
+    "insight.explain.jev.accepted": "The memory was selected within the configured lore token limit.",
+    "insight.jev.accepted": "Budget accepted"
 };
 function wiT(key, ...values) {
     const source = WI_UI_EN[key] ?? key;
@@ -429,6 +499,7 @@ function matchLoreReaderChatTypography(dialog, body) {
 
 // Keep verification on the displayed snapshot, not in saved lore data.
 const confirmedOutletEntries = new WeakSet();
+const confirmedRenderedEntries = new WeakMap();
 const displayedActivationEvents = new WeakMap();
 
 // Explain the most recent confirmed activation using the already-captured
@@ -437,7 +508,11 @@ const displayedActivationEvents = new WeakMap();
 function describeLoreActivation(entry) {
     const outletSuffix = confirmedOutletEntries.has(entry) ? ' · ' + wiT('reader.route.outlet') : '';
     // Jev evidence belongs to this displayed entry, not the saved constant flag.
-    if (entry?.stwiiJevRecall === true) return '🔮 ' + wiT('reader.reason.jev') + outletSuffix;
+    if (entry?.stwiiJevRecall === true) {
+        let selection='';
+        try{selection=globalThis.STWII?.loreInsight?.selectionFor(entry)||'';}catch{}
+        return '🔮 ' + wiT('reader.reason.jev') + (selection?' · '+selection:'') + outletSuffix;
+    }
     const events = chat_metadata.stwiiLastReport?.added;
     const ev = displayedActivationEvents.has(entry) ? displayedActivationEvents.get(entry) :
         (Array.isArray(events) ? events.find(item =>
@@ -697,7 +772,7 @@ function promptTextParts(value) {
     if (value.parts !== undefined) return promptTextParts(value.parts);
     return [];
 }
-function renderedWiContent(entry) {
+function renderedWiContent(entry, preserveWhitespace = false) {
     if (!entry?.content || entry.disable === true) return '';
     if (entry.position === world_info_position.outlet && !entry.outletName) return '';
     try {
@@ -705,37 +780,31 @@ function renderedWiContent(entry) {
         const text = getRegexedString(entry.content, regex_placement.WORLD_INFO, {
             depth, isMarkdown: false, isPrompt: true,
         });
-        return typeof text === 'string' ? text.trim() : '';
+        return typeof text === 'string' ? (preserveWhitespace ? text : text.trim()) : '';
     } catch (error) {
         console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Unable to verify entry content', error);
         return '';
     }
 }
-function confirmedWiEntries(entryList, generationData, insightCapture = null) {
-    const parts = promptTextParts(generationData?.prompt ?? generationData?.input);
-    const finalPrompt = parts.join('\n').replace(/\s+/g, ' ').trim();
-    try{insightCapture?.setPrompt(parts,finalPrompt);}catch{}
+function captureWiCandidates(entryList,generationData,capture){
+    if(!capture)return;
+    const prompt=generationData?.prompt??generationData?.input;
+    capture.setPrompt(Array.isArray(prompt)?requestTextParts(prompt):promptTextParts(prompt),null);
+    for(const entry of entryList){
+        if(capture.truncated)break;
+        capture.add(entry,renderedWiContent(entry,true),entry.position===world_info_position.outlet);
+    }
+}
 
-    return entryList.filter(entry => {
-        confirmedOutletEntries.delete(entry);
-        // SillyTavern has already applied probability, budget, group and activation rules
-        // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
-        // 'No active entries' for ordinary (non-outlet) entries.
-        const rendered = renderedWiContent(entry);
-        try{insightCapture?.add(entry,rendered,entry.position === world_info_position.outlet);}catch{}
-        if (!rendered) return false;
-        if (entry.position !== world_info_position.outlet) return true;
-
-        // Outlet entries are activated by the scan even when no outlet is consumed
-        // by the preset. Only include one if its text actually reaches the request.
-        if (!finalPrompt) return false;
-        const candidates = [rendered, String(entry.content ?? '')];
-        const matched = candidates.some(text => {
-            const normalized = text.replace(/\s+/g, ' ').trim();
-            return normalized.length > 0 && finalPrompt.includes(normalized);
-        });
-        if (matched) confirmedOutletEntries.add(entry);
-        return matched;
+// The badge, reader list, slash command, report and Insight all consume the
+// same verified request rows. Activation flags and arbitrary text hits are
+// never admission evidence.
+function applyConfirmedWiEntries(capture){
+    return verifiedInsightRows(capture).map(row=>{
+        const entry=row.entry;
+        confirmedRenderedEntries.set(entry,row.text);
+        if(row.outlet)confirmedOutletEntries.add(entry);
+        return entry;
     });
 }
 
@@ -1200,15 +1269,7 @@ const init = ()=>{
         trigger.classList.remove('stwii--badge-in', 'stwii--badge-out', 'stwii--badge-bounce');
         if (oldCount !== count) {
             if (count === 0) {
-                if (oldCount < 0) {
-                    trigger.setAttribute('data-stwii--badge-count', '0');
-                    return;
-                }
-                trigger.classList.add('stwii--badge-out');
-                await delay(510);
-                if (token !== badgeToken) return;
                 trigger.setAttribute('data-stwii--badge-count', '0');
-                trigger.classList.remove('stwii--badge-out');
             } else {
                 const cls = oldCount === 0 ? 'stwii--badge-in' : 'stwii--badge-bounce';
                 trigger.setAttribute('data-stwii--badge-count', String(count));
@@ -1228,6 +1289,9 @@ const init = ()=>{
     let currentChatNoteDepth;
     let panelNeedsRender = false;
     let pendingEntries = [];
+    let observedLoreLists=null,promptTrace=null;
+    let noteBeforeScan=null;
+    function releasePromptTrace(){promptTrace?.release();promptTrace=null;}
     let generationSerial = 0;
     let realGenerationInProgress = false;
     let stopConsoleCapture = null;
@@ -1240,6 +1304,9 @@ const init = ()=>{
     const onWorldInfoEntriesLoaded = (lists) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         jevRecall.consume(lists);
+        observedLoreLists=lists;
+        const note=extension_prompts?.['2_floating_prompt']?.value;
+        noteBeforeScan=typeof note==='string'&&note.length<=524288?note:null;
     };
     const resetJevRecall = () => jevRecall.reset();
     eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
@@ -1264,7 +1331,7 @@ const init = ()=>{
             if(api==='openai'&&!model)return null;
             return JSON.stringify([generationSerial,getCurrentChatId(),api,
                 ctx.chatCompletionSettings?.chat_completion_source,ctx.textCompletionSettings?.type,
-                model,ctx.powerUserSettings.tokenizer]);
+                model,ctx.powerUserSettings.tokenizer,ctx.characterId??null,ctx.groupId??null]);
         }catch{return null;}
     }
     function sharedLoreTokenScope(){
@@ -1279,6 +1346,12 @@ const init = ()=>{
         isVisible: world => canShowInsightWorld(world, isAdmin(),
             typeof getCurrentUserHandle === 'function' ? getCurrentUserHandle() : ''),
         reasonLabel: reason => reason === 'multiple' ? wiT('insight.multiple') : wiT('reader.reason.' + reason),
+        reasonIcons: entry => insightReasonCodes(entry,displayedActivationEvents.get(entry)).map(reason=>({
+            key:reason,
+            icon:({constant:strategy.constant,keyword:strategy.normal,vector:strategy.vectorized,
+                jev:strategy.jev.split(' ')[0],sticky:'📌',decorator:'🪄',external:'⚡',unknown:'❔'})[reason],
+            label:wiT('reader.reason.'+reason),
+        })),
         watchRequest: listener => {
             const event=event_types.CHAT_COMPLETION_SETTINGS_READY;
             if(!event)return null;
@@ -1346,7 +1419,7 @@ const init = ()=>{
             let count = null;
             try {
                 const texts = currentEntryList.filter(entry => entry?.type === 'wi')
-                    .map(renderedWiContent).filter(Boolean);
+                    .map(entry=>confirmedRenderedEntries.get(entry)).filter(Boolean);
                 const result = texts.length ? await insightTokens.countText(texts.join('\n')) : 0;
                 if (Number.isFinite(result) && result >= 0) count = Math.round(result);
             } catch {
@@ -1363,8 +1436,7 @@ const init = ()=>{
     // This is the exact number of messages used by the last real WI scan.
     // SillyTavern already logs it; no chat/history scan is needed.
     let stwiiCurrentScanMessageCount = null;
-    // Publish the badge immediately; defer hidden detail DOM construction.
-    // Delay only outlet entries until prompt verification.
+    // Publish only the verified request result; defer hidden detail DOM construction.
     function renderGenerationEntries(list) {
         const signature = generationSerial + ':' + list.map(entry =>
             String(entry.world) + '§§§' + String(entry.uid) + '§§§' + String(entry.sticky || 0) + '§§§' + (entry.stwiiJevRecall === true ? 'jev' : '')).join('|');
@@ -1373,7 +1445,7 @@ const init = ()=>{
         lastRenderedGenerationEntries = signature;
         void updateBadge(list.map(entry => String(entry.world) + '§§§' + String(entry.uid)));
         if (list.length) updatePanel(list, true);
-        else { panelNeedsRender = false; panel.textContent = '?'; tokenFooter = null; }
+        else { panelNeedsRender = false; panel.textContent = wiT('panel.noneVerified'); tokenFooter = null; }
         syncTokenFooter();
     }
 
@@ -1386,6 +1458,8 @@ const init = ()=>{
         insight.start();
         insightTokens.clear();
         generationType = type;
+        releasePromptTrace();
+        observedLoreLists=null;noteBeforeScan=null;
         jevRecall.reset();
         realGenerationInProgress = true;
         startWorldInfoConsoleCapture();
@@ -1408,8 +1482,11 @@ const init = ()=>{
         stwiiCurrentLoopEntryIds = null;
         stwiiCurrentLoopEventIds = null;
         stwiiActiveLoopIndex = -1;
-        // Keep the previous completed result visible until this real run
-        // resolves. Do not show an empty list mid-generation.
+        scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        // Do not show the previous reply's rows as this reply's insertion.
+        renderGenerationEntries([]);
+        panel.textContent=wiT('panel.waiting');
+        lastRenderedGenerationEntries=null;
     };
 
     eventSource.on(event_types.GENERATION_STARTED, beginRealGeneration);
@@ -1420,6 +1497,7 @@ const init = ()=>{
         jevRecall.reset();
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
+        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
         tokenGenerationAwaitingEnd = false;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
@@ -1455,6 +1533,7 @@ const init = ()=>{
     const onWorldInfoActivated = (entryList) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         observedActivatedCount = Array.isArray(entryList) ? entryList.length : null;
+        if(!Array.isArray(entryList))return;
 
         // SillyTavern has already checked and stored timed effects during this
         // WI scan. Read its in-memory end count directly rather than invoking a
@@ -1475,88 +1554,81 @@ const init = ()=>{
                 return snapshot;
             });
         pendingEntries = filtered;
-
-        // Keep the instant list update and verify outlets only in the final prompt.
-        const immediatelyVisible = filtered.filter(entry =>
-            entry.position !== world_info_position.outlet && !!renderedWiContent(entry));
-        renderGenerationEntries(immediatelyVisible);
+        // Native assembly starts after this event; no temporary hooks during
+        // the scan or Jev requests, or when there are no candidates to verify.
+        releasePromptTrace();
+        if(filtered.length&&main_api==='openai')promptTrace=observePromptAssembly(promptManager,()=>extension_prompts,generationType,noteBeforeScan);
+        // Never publish scan candidates, even for ordinary or constant lore.
     };
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, onWorldInfoActivated);
 
     const onGenerateAfterData = (data, dryRun) => {
-        // Ignore dry runs and repeated/later hooks for an already completed run.
-        if (dryRun || !realGenerationInProgress) return;
-        realGenerationInProgress = false;
+        if(dryRun||!realGenerationInProgress)return;
+        realGenerationInProgress=false;
         releaseWorldInfoConsoleCapture();
-        const candidates = pendingEntries;
-        let insightCapture=null;
-        try{insightCapture=STWII.loreInsight?.beginCapture(generationSerial,getCurrentChatId(),observedActivatedCount);}catch{}
-        const included = confirmedWiEntries(candidates, data, insightCapture);
-        jevRecall.reset();
-        pendingEntries = [];
-        // Repaint only if an outlet is confirmed or sticky metadata changed;
-        // otherwise keep the already-built DOM and instant button response.
-        renderGenerationEntries(included);
-        finalizedTokenGeneration = generationSerial;
-        // The legacy footer still waits for completion. Lore Insight can
-        // calculate during streaming when the user opens it.
+        const candidates=pendingEntries,serial=generationSerial,chatId=getCurrentChatId();
+        const build=lastReportBuild?.chatId===chatId?lastReportBuild:null;
+        const complete=canReplaceReport(build,observedActivatedCount,candidates);
+        const captured=build??stwiiCurrentBuild;
+        let trace=null,insightCapture=null;
+        try{trace=promptTrace?.take()??null;}catch{releasePromptTrace();}
+        promptTrace=null;
+        try{
+            insightCapture=STWII.loreInsight?.beginCapture(serial,chatId,observedActivatedCount);
+            captureWiCandidates(candidates,data,insightCapture);
+            if(insightCapture&&(observedActivatedCount!==null||complete)){
+                const skipped=collectNonactivated(observedLoreLists,candidates,scanSkipReasons);
+                insightCapture.nonactivated=skipped.rows;insightCapture.nonactivatedLimited=skipped.limited;
+            }
+        }catch{}
+        observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        pendingEntries=[];jevRecall.reset();
+        finalizedTokenGeneration=serial;
         syncTokenFooter();
 
-        // Keep the complete current report in RAM. Only a verified scan
-        // can replace saved metadata and retire legacy logs.
-        const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
-        const build = lastReportBuild?.chatId === getCurrentChatId() ? lastReportBuild : null;
-        const complete = canReplaceReport(build, observedActivatedCount, candidates);
-        const captured = build ?? stwiiCurrentBuild;
-        const jevIds = new Set(included.filter(entry => entry.stwiiJevRecall === true)
-            .map(entry => String(entry.world) + ':' + String(entry.uid)));
-        const added = (captured?.added ?? []).filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)))
-            .map(ev => jevIds.has(String(ev.world) + ':' + String(ev.uid))
-                ? { ...ev, jevConfirmed: true, logic: 'JEV', reason: 'jev', primary: null, secondary: [], vectorConfirmed: false }
-                : ev);
-        lastLiveReport = {
-            runId: captured?.runId ?? Date.now(),
-            chatId: getCurrentChatId(),
-            added,
-            logs: captured?.logs ?? [],
-            loopCounts: build?.loopCounts ?? [],
-            loopEntryIds: build?.loopEntryIds ?? [],
-            incomplete: !complete,
-        };
-        const eventsById = new Map();
-        for (const ev of added) {
-            const id = String(ev.world) + ':' + String(ev.uid);
-            if (!eventsById.has(id)) eventsById.set(id, ev);
+        // Keep activation reasons available for both the confirmed entries
+        // and the separate diagnostic lists. Do not save raw prompts.
+        const eventsById=new Map();
+        for(const ev of captured?.added??[]){
+            const id=JSON.stringify([ev.world,ev.uid]);
+            if(!eventsById.has(id))eventsById.set(id,ev);
         }
-        for (const entry of included) {
-            displayedActivationEvents.set(entry, eventsById.get(String(entry.world) + ':' + String(entry.uid)) ?? null);
+        for(const entry of candidates){
+            const ev=eventsById.get(JSON.stringify([entry.world,entry.uid]));
+            displayedActivationEvents.set(entry,ev??null);
         }
-        // Explain activated but unverified outlets using captured events without
-        // adding them to the legacy list/report.
-        if (insightCapture) {
-            const includedSet = new Set(included);
-            const unmatchedById = new Map(insightCapture.rows.filter(row => !includedSet.has(row.entry))
-                .map(row => [String(row.entry.world) + ':' + String(row.entry.uid), row.entry]));
-            for (const ev of captured?.added ?? []) {
-                const key = String(ev.world) + ':' + String(ev.uid);
-                const entry = unmatchedById.get(key);
-                if (entry) {
-                    displayedActivationEvents.set(entry, ev);
-                    unmatchedById.delete(key);
-                }
-            }
+        function finalizeVerified(capture){
+            if(serial!==generationSerial||chatId!==getCurrentChatId())return;
+            const included=applyConfirmedWiEntries(capture);
+            renderGenerationEntries(included);
+            const ids=new Set(included.map(it=>String(it.world)+':'+String(it.uid)));
+            const jevIds=new Set(included.filter(entry=>entry.stwiiJevRecall===true)
+                .map(entry=>String(entry.world)+':'+String(entry.uid)));
+            const added=(captured?.added??[]).filter(ev=>ids.has(String(ev.world)+':'+String(ev.uid)))
+                .map(ev=>jevIds.has(String(ev.world)+':'+String(ev.uid))
+                    ?{...ev,jevConfirmed:true,logic:'JEV',reason:'jev',primary:null,secondary:[],vectorConfirmed:false}:ev);
+            const reportComplete=complete&&capture?.rows.length===candidates.length&&hasCompleteEvidence(capture);
+            const originalLoops=build?.loopEntryIds;
+            const loopEntryIds=Array.isArray(originalLoops)&&originalLoops.every(Array.isArray)
+                ?originalLoops.map(group=>group.filter(id=>ids.has(id))):[];
+            lastLiveReport={
+                runId:captured?.runId??Date.now(),chatId,added,logs:captured?.logs??[],
+                loopCounts:loopEntryIds.map(group=>group.length),loopEntryIds,incomplete:!reportComplete,
+            };
+            try{persistReport(chat_metadata,lastLiveReport,reportComplete);}
+            catch(error){console.warn('🦥 WorldInfo Info','[WorldInfo Info] Report storage failed; previous metadata retained',error);}
         }
-        try {
-            persistReport(chat_metadata, lastLiveReport, complete);
-        } catch (error) {
-            console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Report storage failed; previous metadata retained', error);
-        }
-        try {
-            STWII.loreInsight?.finish(insightCapture, complete, main_api === 'openai'
-                ? {messages:data?.prompt,type:generationType} : null);
-        } catch {}
-        lastReportBuild = null;
-        stwiiCurrentBuild = null;
+        try{
+            if(insightCapture)STWII.loreInsight?.finish(insightCapture,complete,main_api==='openai'
+                ?{messages:data?.prompt,type:generationType,structure:promptManager.messages,trace,
+                    squashed:getContext()?.chatCompletionSettings?.squash_system_messages===true,
+                    beforePosition:world_info_position.before,afterPosition:world_info_position.after,
+                    depthPosition:world_info_position.atDepth,anTopPosition:world_info_position.ANTop,
+                    anBottomPosition:world_info_position.ANBottom,
+                    formatWorldInfo:insightOpenAI.formatWorldInfo}:null,finalizeVerified);
+            else finalizeVerified(null);
+        }catch{finalizeVerified(null);}
+        lastReportBuild=null;stwiiCurrentBuild=null;
     };
     eventSource.on(event_types.GENERATE_AFTER_DATA, onGenerateAfterData);
 
@@ -1564,6 +1636,7 @@ const init = ()=>{
     // single event callback only schedules work when the opt-in list is open.
     const onCompletedGeneration = () => {
         releaseWorldInfoConsoleCapture();
+        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;
         if (!tokenGenerationAwaitingEnd || realGenerationInProgress ||
             finalizedTokenGeneration !== generationSerial) return;
         tokenGenerationAwaitingEnd = false;
@@ -1578,6 +1651,8 @@ const init = ()=>{
         insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
+        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        renderGenerationEntries([]);
         if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         realGenerationInProgress = false;
         pendingEntries = [];
@@ -1897,6 +1972,7 @@ function startBuildSession(startedFromScan = false) {
             pendingEntries = [];
             stwiiCurrentLoopEventIds = [];
             stwiiActiveLoopIndex = -1;
+            scanSkipReasons.clear();scanReasonKeyByUid.clear();
         }
         stwiiCurrentBuild = { runId: STWII.currentRunId, startedFromScan, finished: false, finalCount: null, added: [], logs: [] };
     }
@@ -1922,6 +1998,7 @@ function endBuildSession() {
     const vectorActivatedIds = new Set();
     // Track last seen world for a given numeric UID (engine logs sometimes omit the world on follow-up lines)
     const lastWorldByUid = new Map();
+    const scanSkipReasons=new Map(),scanReasonKeyByUid=new Map();
 
     // Build composite key helper "World:UID" or placeholder "?:UID" when world is unknown
     function makeDraftKey(uid, world) {
@@ -1954,6 +2031,23 @@ function endBuildSession() {
     function handleWiDebugArgs(args) {
         if (!args || args.length === 0) return;
         const a0 = args[0];
+
+        // Read only actual engine skip messages; keep bounded metadata, not
+        // another scan or a guessed reason from saved activation flags.
+        const header=typeof args[1]==='string'&&args[1].includes(' processing')?args[2]:null;
+        if(header&&typeof header.world==='string'&&header.uid!=null){
+            const uid=Number(header.uid);
+            lastWorldByUid.set(uid,header.world);
+            if(scanReasonKeyByUid.size<512||scanReasonKeyByUid.has(uid))
+                scanReasonKeyByUid.set(uid,JSON.stringify([header.world,header.uid]));
+        }
+        const skip=scanSkipReason(typeof args[1]==='string'?args[1]:String(a0??''));
+        if(skip){
+            const obj=typeof args[1]==='object'?args[1]:null;
+            const id=obj&&typeof obj.world==='string'&&obj.uid!=null?JSON.stringify([obj.world,obj.uid]):
+                scanReasonKeyByUid.get(parseWiUIDFromFirstArg(a0));
+            if(id&&(scanSkipReasons.size<512||scanSkipReasons.has(id)))scanSkipReasons.set(id,skip);
+        }
 
         // The vector extension reports its own matches before issuing the
         // generic force-activation event. An entry's vectorized flag alone
@@ -2211,7 +2305,7 @@ function endBuildSession() {
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
             firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
-            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
+            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ') || /^WI entry \d+ failed probability check, removing from activated entries$/.test(firstArg)
         )) return original_debug.apply(console, args);
         if (firstArg.includes('[WI] --- START WI SCAN')) stwiiDryRunActive = firstArg.includes('(DRY RUN)');
         if (stwiiDryRunActive) return original_debug.apply(console, args);
@@ -2279,7 +2373,7 @@ function endBuildSession() {
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
             firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
-            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
+            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ') || /^WI entry \d+ failed probability check, removing from activated entries$/.test(firstArg)
         )) return original_log.apply(console, args);
         if (firstArg.includes('[WI] --- START WI SCAN')) stwiiDryRunActive = firstArg.includes('(DRY RUN)');
         if (stwiiDryRunActive) return original_log.apply(console, args);
@@ -2418,6 +2512,7 @@ window.STWII.destroy = function() {
     linkedLoreClickSerial++;
     closeLoreViewer();
     releaseWorldInfoConsoleCapture();
+    releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
     try {
         const t = window.STWII.trigger;
         if (t && t.parentNode) t.parentNode.removeChild(t);

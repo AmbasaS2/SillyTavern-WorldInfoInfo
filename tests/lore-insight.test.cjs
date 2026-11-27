@@ -44,11 +44,12 @@ test('identical text coalesces, scope changes and failures invalidate',async()=>
  assert.equal(await cache.countText('bad'),null);assert.equal(await cache.countText('bad'),null);assert.equal(calls,5);
  cache.clear();await cache.countText('a');assert.equal(calls,6);
 });
-test('only explicit estimates count matched text; missing and cancelled values are not zero',async()=>{
+test('only verified insertion estimates are counted; missing and cancelled values are not zero',async()=>{
  const {createInsightCapture,inspectInsight,estimateInsight}=await mod();
  const cap=createInsightCapture(1,'chat',3);
- cap.setPrompt(['First fact. Second fact.'],'First fact. Second fact.');
+ cap.setPrompt(['First fact. Second fact.'],null,'request');
  cap.add(entry(1),'First fact.');cap.add(entry(2),'Second fact.');cap.add(entry(3),'Absent.');
+ cap.proven=new Map([['["Book",1]','First fact.\n'],['["Book",2]','Second fact.\n']]);
  let rows=inspectInsight(cap),calls=[];
  const count=async s=>{calls.push(s);return s==='Second fact.\n'?null:s.length};
  assert.equal(calls.length,0);
@@ -121,8 +122,9 @@ test('in-flight count is discarded on scope change or clear',async()=>{
 test('retry only missing counts and preserve successful estimates',async()=>{
  const {createInsightCapture,inspectInsight,estimateInsight}=await mod();
  const cap=createInsightCapture(1,'chat',2);
- cap.setPrompt(['A text and B text'],null);
+ cap.setPrompt(['A text and B text'],null,'request');
  cap.add(entry(1),'A text');cap.add(entry(2),'B text');
+ cap.proven=new Map([['["Book",1]','A text\n'],['["Book",2]','B text\n']]);
  const rows=inspectInsight(cap);let calls=[];
  const first=await estimateInsight(rows,cap,async s=>{calls.push(s);return s==='B text\n'?null:s.length},()=>true,true);
  assert.equal(first.failed,true);assert.equal(rows[0].tokens,7);
@@ -131,7 +133,7 @@ test('retry only missing counts and preserve successful estimates',async()=>{
  assert.equal(second.failed,false);assert.deepEqual(calls,['B text\n']);
 });
 
-test('outlet fallback counts exact found text, not the transformed text or name',async()=>{
+test('outlet text-only evidence never counts as an actual injection',async()=>{
  const {createInsightCapture,inspectInsight,estimateInsight}=await mod();
  const cap=createInsightCapture(1,'chat',3);
  cap.setPrompt(['Raw outlet fact. An ordinary fact.'],null,'request');
@@ -142,7 +144,7 @@ test('outlet fallback counts exact found text, not the transformed text or name'
  assert.deepEqual(rows.map(r=>r.status),['matched','unmatched','unmatched']);
  assert.equal(rows[0].text,'Raw outlet fact.');
  const calls=[];await estimateInsight(rows,cap,async s=>{calls.push(s);return s.length},()=>true,true);
- assert.ok(calls.includes('Raw outlet fact.\n'));assert.ok(!calls.some(s=>s.includes('Transformed outlet fact.')));
+ assert.ok(!calls.includes('Raw outlet fact.\n'));assert.ok(!calls.some(s=>s.includes('Transformed outlet fact.')));
 });
 test('outlet fallback retains ambiguity for repeated and overlapping text',async()=>{
  const {createInsightCapture,inspectInsight}=await mod();
@@ -170,22 +172,27 @@ function fakeDocument(){
  const body=new El('body');return {body,activeElement:null,createElement:tag=>new El(tag)};
 }
 const tick=()=>new Promise(r=>setTimeout(r,15));
-test('live dialog updates before completion, counts only on open, and reuses results',async()=>{
- const {createLoreInsight}=await mod();const old=global.document;global.document=fakeDocument();
+function expand(section){section.open=true;section.handlers.toggle?.();return section;}
+test('live dialog publishes only verified request entries before completion and reuses counts',async()=>{
+ const {createLoreInsight,verifiedInsightRows}=await mod();const old=global.document;global.document=fakeDocument();
  try{
-  let listener=null,calls=[],chat='chat';
+  let listener=null,calls=[],chat='chat',finals=[];
   const insight=createLoreInsight({t:(k,n)=>k+(n===undefined?'':' '+n),countText:async s=>{calls.push(s);return s.length},getScope:()=> 'same',getChatId:()=>chat,getReason:()=> 'constant',titleFor:e=>e.comment,isVisible:()=>true,reasonLabel:r=>r,watchRequest:fn=>{listener=fn;return()=>{listener=null;}}});
   insight.start();insight.open();assert.match(document.body.textContent,/insight.waiting/);
-  const msg={content:'Present. Absent.'};const cap=insight.beginCapture(1,'chat',3);cap.setPrompt([msg.content],null);
-  cap.add({...entry(1),comment:'Present entry'},'Present.');cap.add({...entry(2),comment:'Removed entry'},'Absent.');
-  cap.add({...entry(3),comment:'Outlet entry',outletName:'outlet'},'Never present.',true);
-  insight.finish(cap,true,{messages:[msg],type:'normal'});
-  assert.match(document.body.textContent,/insight.matched/);assert.doesNotMatch(document.body.textContent,/insight.waiting/);
-  msg.content='Present.';listener({type:'normal',messages:[msg]});assert.equal(listener,null);
-  await tick();assert.ok(calls.length>0);assert.ok(!calls.some(x=>x.includes('Absent')));
-  let sections=document.body.walk().filter(x=>x.dataset.insightSection==='matched'||x.dataset.insightSection==='unresolved');
-  assert.equal(sections.length,2);assert.match(sections[0].textContent,/Present entry/);assert.doesNotMatch(sections[0].textContent,/Removed entry/);
-  assert.match(sections[1].textContent,/Removed entry/);assert.match(sections[1].textContent,/reader.route.outlet/);assert.match(document.body.textContent,/insight.source.request/);
+  const first={role:'system',content:'Present.'},second={role:'system',content:'Absent.'},oldChat={role:'user',content:'Never present.'};
+  const cap=insight.beginCapture(1,'chat',3);cap.setPrompt([first.content,second.content,oldChat.content],null);
+  cap.add({...entry(1),position:0,order:1,comment:'Present entry'},'Present.');
+  cap.add({...entry(2),position:1,order:2,comment:'Removed entry'},'Absent.');
+  cap.add({...entry(3),position:7,comment:'Outlet entry',outletName:'outlet'},'Never present.',true);
+  cap.nonactivated=[{entry:{...entry(4),comment:'Not activated'},reason:'cooldown'}];
+  const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...first,identifier:'worldInfoBefore'}]},{identifier:'worldInfoAfter',getCollection:()=>[{...second,identifier:'worldInfoAfter'}]},{identifier:'chatHistory',getCollection:()=>[{...oldChat,identifier:'chatHistory-1'}]}]};
+  insight.finish(cap,true,{messages:[first,second,oldChat],type:'normal',structure,beforePosition:0,afterPosition:1,formatWorldInfo:s=>s},c=>finals.push(verifiedInsightRows(c).map(r=>r.entry.uid)));
+  assert.match(document.body.textContent,/insight.waiting/);assert.equal(finals.length,0);assert.equal(calls.length,0);
+  second.content='Modified.';listener({type:'normal',messages:[first,second,oldChat]});assert.equal(listener,null);
+  await tick();assert.deepEqual(finals,[[1]]);assert.ok(calls.includes('Present.\n'));assert.ok(!calls.includes('Absent.\n'));assert.ok(!calls.includes('Never present.\n'));
+  const sections=document.body.walk().filter(x=>x.dataset.insightSection==='matched'||x.dataset.insightSection==='unresolved'||x.dataset.insightSection==='nonactivated');
+  assert.equal(sections.length,3);assert.ok(sections.every(s=>s.childElementCount===1));sections.forEach(expand);assert.match(sections[0].textContent,/Present entry/);assert.doesNotMatch(sections[0].textContent,/Removed entry|Outlet entry|Not activated/);
+  assert.match(sections[1].textContent,/Removed entry/);assert.match(sections[1].textContent,/reader.route.outlet/);assert.match(sections[2].textContent,/Not activated/);assert.match(sections[2].textContent,/insight.skip.cooldown/);assert.match(document.body.textContent,/insight.source.request/);
   const count=calls.length;insight.ready();await tick();assert.equal(calls.length,count);
   insight.close();insight.open();await tick();assert.equal(calls.length,count);
   insight.close();insight.start();const next=insight.beginCapture(2,'chat',1);next.setPrompt(['Next.'],null);next.add(entry(9),'Next.');
@@ -199,5 +206,104 @@ test('closing the dialog or changing chat cancels scheduled automatic measuremen
   insight.start();const cap=insight.beginCapture(1,'chat',1);cap.setPrompt(['Text.'],null);cap.add(entry(1),'Text.');
   insight.finish(cap,true,null);insight.open();insight.close();await tick();assert.equal(calls,0);
   insight.open();chat='other';await tick();assert.equal(calls,0);insight.clear();
+ }finally{global.document=old;}
+});
+
+test('STLO consumer publishes structural evidence when closed and counts only when opened',async()=>{
+ const {createLoreInsight}=await mod();const old=global.document;global.document=fakeDocument();
+ try{
+  let listener=null,calls=[],publications=[],local=0;
+  const generation={},context={generation,tokenizer:'st-1:test'};
+  const ledger=new Map();
+  const bridge={version:1,context:()=>context,
+   selection:()=>({decision:'include',source:'adaptive-role',score:0.91,budget:'accepted',activated:true}),
+   lookup:d=>ledger.get(d.text)??null,
+   measure:async d=>{calls.push(d);ledger.set(d.text,17);return 17},
+   publishInjection:d=>{publications.push(d);return true}};
+  const insight=createLoreInsight({t:(k,v)=>k+(v===undefined?'':' '+v),countText:async s=>{local++;return s.length},getScope:()=> 'scope',getChatId:()=> 'chat',getReason:()=> 'jev',titleFor:e=>e.comment,isVisible:()=>true,reasonLabel:r=>r,getMetricsBridge:()=>bridge,watchRequest:fn=>{listener=fn;return()=>{listener=null}}});
+  insight.start();const a={...entry(1),position:0,order:1,stwiiJevRecall:true,comment:'Jev scene'},b={...entry(2),position:4,order:2,stwiiJevRecall:true,comment:'Depth scene'};
+  const cap=insight.beginCapture(1,'chat',2);cap.add(a,'A scene.');cap.add(b,'B scene.');cap.setPrompt(['A scene.','B scene.'],null);
+  const first={role:'system',content:'A scene.'},second={role:'system',content:'B scene.'};
+  const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...first,identifier:'worldInfoBefore'}]},{identifier:'chatHistory',getCollection:()=>[{...second,identifier:'chatHistory-1'}]}]};
+  insight.finish(cap,true,{messages:[first,second],type:'normal',structure,beforePosition:0,afterPosition:1,formatWorldInfo:s=>s});
+  listener({type:'normal',messages:[first,second]});
+  assert.equal(publications.length,1);assert.equal(calls.length,0);assert.equal(local,0);
+  assert.deepEqual(publications[0].records,[{key:'["Book",1]',status:'confirmed',text:'A scene.\n'},{key:'["Book",2]',status:'unknown'}]);
+  assert.equal(publications[0].complete,true);
+  insight.open();await tick();
+  assert.equal(calls.length,1);assert.equal(local,2);assert.equal(publications.length,2);
+  assert.match(insight.selectionFor(a),/adaptive-role/);
+  for(const section of document.body.walk().filter(x=>['matched','unresolved'].includes(x.dataset.insightSection)))expand(section);
+  assert.match(document.body.textContent,/insight.jev.score/);
+  assert.match(document.body.textContent,/insight.evidence.summary/);
+  const entries=document.body.walk().filter(x=>x.className==='stwii--insight-entry');
+  assert.match(entries.find(x=>x.textContent.includes('Jev scene')).textContent,/insight.evidence.verified/);
+  const depthRow=entries.find(x=>x.textContent.includes('Depth scene'));
+  assert.match(depthRow.textContent,/insight.evidence.textOnly/);
+  assert.doesNotMatch(document.body.walk().find(x=>x.dataset.insightSection==='matched').textContent,/Depth scene/);
+  const jevRow=entries.find(x=>x.textContent.includes('Jev scene'));
+  const budget=jevRow.walk().find(x=>x.tagName==='button'&&x.textContent==='insight.jev.accepted');
+  assert.ok(budget);const help=jevRow.walk().find(x=>x.className==='stwii--insight-term-help');
+  budget.handlers.click();assert.equal(help.hidden,false);assert.equal(help.textContent,'insight.explain.jev.accepted');
+  budget.handlers.click();assert.equal(help.hidden,true);
+  const rowBefore=jevRow;const countBefore=calls.length;
+  expand(document.body.walk().find(x=>x.dataset.insightSection==='matched'));
+  assert.ok(document.body.walk().includes(rowBefore));assert.equal(calls.length,countBefore);
+  assert.equal(publications[1].records[1].status,'unknown');insight.clear();
+ }finally{global.document=old;}
+});
+
+test('structural source evidence stays distinct from text-only and changed text',async()=>{
+ const {createInsightCapture,inspectInsight}=await mod();
+ const cap=createInsightCapture(1,'chat',4);cap.setPrompt(['Twin. Twin. Depth. Altered original.'],null,'request');
+ cap.add(entry(1),'Twin.');cap.add(entry(2),'Twin.');cap.add(entry(3),'Depth.');cap.add(entry(4),'Original.');
+ cap.proven=new Map([['["Book",1]','Twin.\n'],['["Book",2]','Twin.\n']]);
+ assert.deepEqual(inspectInsight(cap).map(r=>[r.status,r.sourceVerified]),[['matched',true],['matched',true],['matched',false],['unmatched',false]]);
+ cap.proven.clear();
+ assert.deepEqual(inspectInsight(cap).map(r=>[r.status,r.sourceVerified]),[['ambiguous',false],['ambiguous',false],['matched',false],['unmatched',false]]);
+});
+
+test('actual membership excludes text-only hits, inactive entries and prior assembled data',async()=>{
+ const {createInsightCapture,verifiedInsightRows,inspectInsight,estimateInsight}=await mod();
+ const cap=createInsightCapture(1,'chat',4);
+ cap.add(entry(1),'Real.');cap.add(entry(2),'Same text.');cap.add(entry(3),'Disabled block.');cap.add(entry(4),'Missing.');
+ cap.setPrompt(['Real. Same text. Disabled block.'],null);cap.proven.set('["Book",1]','Real.\n');
+ assert.equal(verifiedInsightRows(cap).length,0);
+ cap.setPrompt(['Real. Same text. Disabled block.'],null,'request');
+ assert.equal(verifiedInsightRows(cap).length,0);
+ cap.proven.set('["Book",1]','Real.\n');cap.inspection=null;
+ cap.excluded.set('["Book",3]','preset');
+ assert.deepEqual(verifiedInsightRows(cap).map(r=>r.entry.uid),[1]);
+ assert.equal(inspectInsight(cap)[2].status,'excluded');
+ const calls=[];await estimateInsight(inspectInsight(cap),cap,async s=>{calls.push(s);return s.length},()=>true,true);
+ assert.ok(calls.includes('Real.\n'));assert.ok(!calls.includes('Same text.\n'));assert.ok(!calls.includes('Disabled block.\n'));
+ cap.setPrompt(['Same text.'],null,'request');
+ // Proof records are produced only by the correlated request confirmer.
+ assert.equal(verifiedInsightRows(cap).length,0);
+});
+
+test('closed disclosure creates no rows, automatic token updates preserve expanded DOM and help',async()=>{
+ const {createLoreInsight}=await mod();const old=global.document;global.document=fakeDocument();
+ try{
+  let listener,resolve;
+  const insight=createLoreInsight({t:k=>k,countText:()=>new Promise(r=>{resolve=r}),getScope:()=> 'scope',getChatId:()=> 'chat',getReason:()=> 'constant',titleFor:e=>e.comment,isVisible:()=>true,reasonLabel:r=>r,watchRequest:fn=>{listener=fn;return()=>{listener=null;}}});
+  insight.start();
+  const msg={role:'system',content:'Real.'},cap=insight.beginCapture(1,'chat',1);
+  cap.setPrompt(['Real.'],null);cap.add({...entry(1),position:0,order:1,comment:'Real entry'},'Real.');
+  cap.nonactivated=Array.from({length:100},(_,i)=>({entry:{...entry(i+2),comment:'skip '+i},reason:'cooldown'}));
+  const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...msg,identifier:'worldInfoBefore'}]}]};
+  insight.finish(cap,true,{messages:[msg],type:'normal',structure,beforePosition:0,formatWorldInfo:s=>s});
+  listener({type:'normal',messages:[msg]});insight.open();
+  const matched=document.body.walk().find(x=>x.dataset.insightSection==='matched');
+  const skipped=document.body.walk().find(x=>x.dataset.insightSection==='nonactivated');
+  assert.equal(matched.childElementCount,1);assert.equal(skipped.childElementCount,1);
+  expand(matched);const row=matched.children[1],term=row.walk().find(x=>x.tagName==='button'&&x.textContent==='insight.evidence.verified');
+  term.handlers.click();await tick();
+  for(let i=0;i<3;i++){resolve(5);await tick();}
+  assert.equal(matched.children[1],row);assert.equal(skipped.childElementCount,1);
+  assert.equal(row.walk().find(x=>x.className==='stwii--insight-entry-tokens').textContent,'~5 T');
+  assert.equal(row.walk().find(x=>x.className==='stwii--insight-term-help').hidden,false);
+  expand(skipped);assert.equal(skipped.childElementCount,101);expand(skipped);assert.equal(skipped.childElementCount,101);
+  insight.clear();
  }finally{global.document=old;}
 });

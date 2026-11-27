@@ -411,10 +411,20 @@
 .stwii--insight-line + .stwii--insight-line,.stwii--insight-entry + .stwii--insight-entry {
   border-top:1px solid color-mix(in srgb,var(--SmartThemeBorderColor,currentColor) 65%,transparent);
 }
-.stwii--insight-line strong,.stwii--insight-entry span {font-variant-numeric:tabular-nums;font-size:.85em;text-align:right;}
+.stwii--insight-line strong,.stwii--insight-entry-tokens {font-variant-numeric:tabular-nums;font-size:.85em;text-align:right;}
 .stwii--insight-entry {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;padding:7px 0;}
-.stwii--insight-entry small {grid-column:1;grid-row:2;}
-.stwii--insight-entry span {grid-column:2;grid-row:1 / span 2;align-self:center;}
+.stwii--insight-entry-copy {min-width:0;display:flex;flex-direction:column;gap:3px;}
+.stwii--insight-entry-heading {min-width:0;display:flex;align-items:baseline;gap:5px;line-height:1.35;}
+.stwii--insight-entry-name {min-width:0;overflow-wrap:anywhere;}
+.stwii--insight-entry-meta {overflow-wrap:anywhere;line-height:1.4;}
+.stwii--insight-entry-tokens {grid-column:2;grid-row:1;align-self:center;white-space:nowrap;}
+.stwii--insight-terms {display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;min-width:0;}
+.stwii--insight-term {appearance:none;background:transparent;border:0;border-radius:3px;color:inherit;font:inherit;font-size:.8em;line-height:1.4;min-width:0;padding:3px 1px;text-align:left;white-space:normal;overflow-wrap:anywhere;cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;}
+.stwii--insight-term[aria-expanded=true] {color:var(--SmartThemeQuoteColor,var(--SmartThemeEmColor,currentColor));}
+.stwii--insight-term:focus-visible {outline:2px solid var(--SmartThemeEmColor,currentColor);outline-offset:2px;}
+.stwii--insight-reason-icon {flex-shrink:0;font-size:1em;padding:1px;text-decoration:none;}
+.stwii--insight-term-help {margin:3px 0 0;padding:6px 8px;border-left:2px solid var(--SmartThemeEmColor,currentColor);font-size:.8em;line-height:1.45;overflow-wrap:anywhere;}
+.stwii--insight-term-help[hidden] {display:none;}
 .stwii--insight-measure {min-height:36px;width:100%;box-sizing:border-box;flex-shrink:0;}
 @media(max-width:600px){.stwii--insight-dialog{padding:12px;max-height:86dvh}.stwii--insight-line{gap:5px}}
 
@@ -435,4 +445,4 @@
 .stwii--insight-help{font-size:.82em;opacity:.83;min-width:0;}
 .stwii--insight-help>summary{cursor:pointer;padding:2px 0;}
 .stwii--insight-help>p{margin:6px 0 0;font-size:1em;line-height:1.45;}
-.stwii--insight-entry:not(:has(>span)){grid-template-columns:minmax(0,1fr);}
+.stwii--insight-entry:not(:has(>.stwii--insight-entry-tokens)){grid-template-columns:minmax(0,1fr);}

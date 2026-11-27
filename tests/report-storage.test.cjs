@@ -127,7 +127,10 @@ function between(start, end) {
 }
 async function harness() {
     const { canReplaceReport, persistReport } = await api();
+    const {createInsightCapture,verifiedInsightRows,hasCompleteEvidence,requestTextParts}=await import('../lore-insight.mjs');
+    const {collectNonactivated,scanSkipReason}=await import('../prompt-inclusion.mjs');
     const metadata = legacyMetadata();
+    let pending=null;
     const ctx = vm.createContext({
         chat_metadata: metadata, STWII: { MAX_BUILD_LOGS: 2000 }, window: { STWII: {} },
         getCurrentChatId: () => 'test', canReplaceReport, persistReport, console: { warn() {} },
@@ -136,12 +139,19 @@ async function harness() {
         stwiiCurrentLoopCounts: null, stwiiCurrentLoopEntryIds: null, stwiiCurrentLoopEventIds: null,
         stwiiActiveLoopIndex: -1, stwiiDryRunActive: false,
         generationSerial: 1, finalizedTokenGeneration: -1, displayedActivationEvents: new WeakMap(),
-        confirmedWiEntries: list => list, world_info_position: { outlet: 7 },
+        world_info_position: { outlet: 7 },main_api:'test',promptTrace:null,observedLoreLists:null,noteBeforeScan:null,
+        releasePromptTrace(){},collectNonactivated,scanSkipReason,hasCompleteEvidence,verifiedInsightRows,
+        captureWiCandidates(list,data,cap){cap.setPrompt(['test'],null);for(const e of list)cap.add(e,e.content);},
+        applyConfirmedWiEntries:cap=>verifiedInsightRows(cap).map(row=>row.entry),
         renderedWiContent: e => e.content, jevRecall: { annotate: e => ({ ...e }), reset() {} },
         renderGenerationEntries(list) { ctx.visible = list; },
         syncTokenFooter() {}, releaseWorldInfoConsoleCapture() {},
         noop() {},
     });
+    ctx.STWII.loreInsight={
+        beginCapture:createInsightCapture,
+        finish(capture,complete,info,callback){pending={capture,callback};}
+    };
     vm.runInContext(
         between('function pushBounded(', '\nconst strategy = {') +
         between('function startBuildSession(', '    const worldInfoLogSources =') +
@@ -153,7 +163,15 @@ async function harness() {
         debug: (...args) => ctx.captureDebug(ctx.noop, ...args),
         log: (...args) => ctx.captureLog(ctx.noop, ...args),
         activate: list => vm.runInContext('onWorldInfoActivated', ctx)(list),
-        finalize: (dryRun = false) => vm.runInContext('onGenerateAfterData', ctx)({ prompt: 'test' }, dryRun),
+        assemble: (dryRun = false) => vm.runInContext('onGenerateAfterData', ctx)({ prompt: 'test' }, dryRun),
+        send(allowed=null){
+            if(!pending)return;
+            const {capture,callback}=pending;pending=null;
+            const rows=capture.rows.filter(row=>allowed===null||allowed.includes(row.entry.uid));
+            capture.setPrompt(rows.map(row=>row.text),null,'request');
+            for(const row of rows)capture.proven.set(JSON.stringify([row.entry.world,row.entry.uid]),row.text+'\n');
+            callback(capture);
+        },
     };
 }
 test('mixed real engine debug/log sequence stores one complete report without intermediate writes', async () => {
@@ -172,7 +190,10 @@ test('mixed real engine debug/log sequence stores one complete report without in
     h.debug('[WI] --- DONE ---');
     h.activate(entries);
     assert.deepEqual(h.metadata, before);
-    h.finalize();
+    assert.equal(h.ctx.visible,undefined);
+    h.assemble();
+    assert.equal(h.ctx.visible,undefined);assert.deepEqual(h.metadata,before);
+    h.send();
     assert.equal(h.ctx.lastLiveReport.incomplete, false);
     assert.equal(h.metadata.stwiiLastReport.added.length, 3);
     assert.equal(h.metadata.stwiiLastReport.loopCounts[0], 3);
@@ -187,14 +208,14 @@ test('dry-run and missing activation diagnostics do not delete or overwrite lega
     h.debug('[WI] --- START WI SCAN (on 12 messages, trigger = normal) (DRY RUN) ---');
     h.log('[WI] Hypothetically adding 1 entries to prompt', entries);
     h.debug('[WI] --- DONE (DRY RUN) ---');
-    h.finalize(true);
+    h.assemble(true);h.send();
     assert.deepEqual(h.metadata, before);
     h.debug('[WI] --- START WI SCAN (on 12 messages, trigger = normal) ---');
     h.debug('[WI] Successfully activated 1 new entries to prompt. 1 total entries activated.', entries);
     h.log('[WI] Adding 1 entries to prompt', entries);
     h.debug('[WI] --- DONE ---');
     h.activate(entries);
-    h.finalize();
+    h.assemble();h.send();
     assert.equal(h.ctx.lastLiveReport.incomplete, true);
     assert.deepEqual(h.metadata, before);
     assert.equal(h.ctx.displayedActivationEvents.get(h.ctx.visible[0]), null);
@@ -208,4 +229,16 @@ test('report UI uses full session report and shows storage or capture warning in
         assert.ok(locale['worldInfoInfo.report.truncated']);
         assert.ok(locale['worldInfoInfo.report.incomplete']);
     }
+});
+
+test('report and book list exclude unverified activated entries and preserve previous saved report',async()=>{
+    const h=await harness(),before=structuredClone(h.metadata);
+    const entries=sampleEvents(2).map(e=>({...e,content:'Lore '+e.uid,position:0}));
+    h.debug('[WI] --- START WI SCAN (on 12 messages, trigger = normal) ---');
+    for(const e of entries)h.debug('[WI] Entry '+e.uid+' activation successful, adding to prompt',e);
+    h.debug('[WI] Successfully activated 2 new entries to prompt. 2 total entries activated.',entries);
+    h.log('[WI] Adding 2 entries to prompt',entries);h.debug('[WI] --- DONE ---');
+    h.activate(entries);h.assemble();h.send([entries[0].uid]);
+    assert.equal(h.ctx.visible.length,1);assert.equal(h.ctx.lastLiveReport.added.length,1);
+    assert.equal(h.ctx.lastLiveReport.incomplete,true);assert.deepEqual(h.metadata,before);
 });

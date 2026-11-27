@@ -29,7 +29,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.12.**
+**Current version: 1.7.1-ambasa.13.**
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
@@ -271,7 +271,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.12.**
+**현재 버전: 1.7.1-ambasa.13.**
 
 > **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
 >
@@ -420,7 +420,7 @@ This project retains the GNU Affero General Public License v3.0. See [LICENSE](.
 
 
 ### Lore Insight
-Right-click / long-press the book button and choose **View Lore Insight / 로어 인사이트 보기**. The separate read-only dialog distinguishes captured activation from text matches in the assembled prompt or correlated pre-send request; estimates are on demand, not API usage. The recovery command `/wi-position-reset` remains. See [measurement limits and integration](docs/lore-insight-v1.md).
+Right-click / long-press the book button and choose **View Lore Insight / 로어 인사이트 보기**. The book list and Lore Insight's included-lore totals use verified insertion in the correlated pre-send chat-completion request. Omitted, unverified and observed inactive entries are separate diagnostics. Click a short term for its explanation; token estimates run only when the Insight dialog is open. The recovery command `/wi-position-reset` remains. See [measurement limits and integration](docs/lore-insight-v1.md).
 
 
 **1.7.1-ambasa.11:** Standalone Lore Insight is available for early use. New STLO token reuse and detailed selection-reason integration, additional locale coverage, and full joint runtime regression are still pending. The legacy optional Jev marker remains supported. Rollback: 1.7.1-ambasa.10 (`342e92e`).
@@ -431,3 +431,8 @@ Right-click / long-press the book button and choose **View Lore Insight / 로어
 **1.7.1-ambasa.12:** Lore Insight is available once the generation request is assembled, including while the reply streams. Open the dialog to estimate tokens automatically; successful counts are reused. Verified text matches and unverified activated entries have separate sections. See the in-dialog help for scope and uncertainty.
 
 **1.7.1-ambasa.12:** 요청 준비 후 답변 생성 중에도 로어 인사이트를 볼 수 있고, 열었을 때만 토큰을 자동 추정합니다. 주입 확인 로어와 주입 여부 미확인 로어를 분리하고 상세 기준은 창 하단 도움말에 표시합니다.
+
+
+**1.7.1-ambasa.13:** Verified-request-only book list and Lore Insight totals; separate omission and nonactivation diagnostics; direct-click term help, existing activation icons, all supported locale files, lazy details, incremental token updates and optional STLO metrics v1. Verified on ST 1.19.1: actual after-character, depth and used outlet insertion; disabled preset, unused outlet and inactive entries do not enter confirmed totals even when matching text occurs in chat; system-message squashing supported in the tested fixture. Unsupported insertion/transport routes remain unverified. Rollback: cc615d3 (.12).
+
+**1.7.1-ambasa.13:** 실제 전송 요청의 주입 확인 항목만 책 목록과 로어 인사이트 집계에 표시합니다. 미주입·주입 미확인·미발동은 별도 구획에서 확인하며 짧은 용어를 클릭하면 설명이 펼쳐집니다. 기존 발동 아이콘, STLO 선택 연동, 지연 렌더링 및 숫자만 갱신하는 계측을 지원합니다. 확인 근거가 없는 경로는 주입 목록에 포함하지 않습니다. 복구 기준 cc615d3 (.12).
