@@ -154,3 +154,33 @@ test('console capture checks source stacks only for potential World Info message
  assert.equal(received.length,4);
  ctx.releaseWorldInfoConsoleCapture();assert.equal(fakeConsole.log,originalLog);assert.equal(fakeConsole.debug,originalDebug);
 });
+
+
+test('failed optional token count can retry on reopen, successful count is reused', async () => {
+    const pending = [], entry = { type: 'wi' };
+    let calls = 0;
+    const context = vm.createContext({
+        generationSerial: 1, finalizedTokenGeneration: 1, tokenSummary: null,
+        tokenSummaryPending: -1, tokenSummaryRequest: 0, realGenerationInProgress: false,
+        tokenGenerationAwaitingEnd: false, currentEntryList: [entry],
+        confirmedRenderedEntries: new Map([[entry, 'lore text']]),
+        panel: { classList: { contains: () => true } },
+        getCurrentChatId: () => 'chat-a', showTokenTotal: () => true,
+        syncTokenFooter() {}, ensurePanelsVisible() {},
+        requestAnimationFrame: fn => fn(), setTimeout: fn => pending.push(fn),
+        insightTokens: { async countText() { if (++calls === 1) throw Error('temporary failure'); return 123; } },
+    });
+    vm.runInContext(extract('    function scheduleTokenSummary() {', '    // This is the exact number'), context);
+    context.scheduleTokenSummary();
+    context.scheduleTokenSummary();
+    assert.equal(pending.length, 1);
+    await pending.shift()();
+    assert.equal(context.tokenSummary.count, null);
+    context.scheduleTokenSummary();
+    assert.equal(pending.length, 1);
+    await pending.shift()();
+    assert.equal(context.tokenSummary.count, 123);
+    context.scheduleTokenSummary();
+    assert.equal(pending.length, 0);
+    assert.equal(calls, 2);
+});
