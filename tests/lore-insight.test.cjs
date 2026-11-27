@@ -226,6 +226,20 @@ test('STLO consumer publishes structural evidence when closed and counts only wh
   insight.open();await tick();
   assert.equal(calls.length,2);assert.equal(local,2);assert.equal(publications.length,2);
   assert.match(insight.selectionFor(a),/adaptive-role/);assert.match(document.body.textContent,/insight.jev.score/);
+  assert.match(document.body.textContent,/insight.evidence.summary/);
+  const entries=document.body.walk().filter(x=>x.className==='stwii--insight-entry');
+  assert.match(entries.find(x=>x.textContent.includes('Jev scene')).textContent,/insight.evidence.verified/);
+  assert.match(entries.find(x=>x.textContent.includes('Depth scene')).textContent,/insight.evidence.textOnly/);
   assert.equal(publications[1].records[1].status,'unknown');insight.clear();
  }finally{global.document=old;}
+});
+
+test('structural source evidence stays distinct from text-only and changed text',async()=>{
+ const {createInsightCapture,inspectInsight}=await mod();
+ const cap=createInsightCapture(1,'chat',4);cap.setPrompt(['Twin. Twin. Depth. Altered original.'],null,'request');
+ cap.add(entry(1),'Twin.');cap.add(entry(2),'Twin.');cap.add(entry(3),'Depth.');cap.add(entry(4),'Original.');
+ cap.proven=new Map([['["Book",1]','Twin.\n'],['["Book",2]','Twin.\n']]);
+ assert.deepEqual(inspectInsight(cap).map(r=>[r.status,r.sourceVerified]),[['matched',true],['matched',true],['matched',false],['unmatched',false]]);
+ cap.proven.clear();
+ assert.deepEqual(inspectInsight(cap).map(r=>[r.status,r.sourceVerified]),[['ambiguous',false],['ambiguous',false],['matched',false],['unmatched',false]]);
 });

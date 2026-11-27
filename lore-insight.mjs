@@ -125,7 +125,8 @@ export function inspectInsight(capture) {
     // elsewhere. The evidence publisher never uses ordinary substring matches.
     for(const row of rows){
         const proven=capture.proven?.get(metricsKey(row.entry));
-        if(typeof proven==='string'&&proven===row.text+'\n')row.status='matched';
+        row.sourceVerified=typeof proven==='string'&&proven===row.text+'\n';
+        if(row.sourceVerified)row.status='matched';
     }
     return rows;
 }
@@ -368,7 +369,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
                 const selection=selectionFor(row.entry);
                 if(selection)meta.push(selection);
                 if(row.outlet)meta.push(t('reader.route.outlet')+(row.entry.outletName?' · '+String(row.entry.outletName):''));
-                if(!verified)meta.push(t('insight.'+row.status));
+                meta.push(t(verified?(row.sourceVerified?'insight.evidence.verified':'insight.evidence.textOnly'):'insight.'+row.status));
                 line.append(element('strong','',name),element('small','',meta.join(' · ')));
                 if(verified)line.append(element('span','',formatted(row.tokens)));
                 detail.append(line);
@@ -382,6 +383,10 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             const grid=element('div','stwii--insight-grid');
             grid.append(card(t('insight.matched'),t('insight.count',matched.length)),card(t('insight.total'),formatted(measurement?.total)));
             report.append(grid);
+            if(matched.length){
+                const proven=matched.filter(row=>row.sourceVerified).length;
+                report.append(element('p','stwii--insight-note',t('insight.evidence.summary',proven,matched.length-proven)));
+            }
             const ratio=measurement?.prompt>0&&validCount(measurement.total)&&measurement.total<=measurement.prompt?measurement.total/measurement.prompt:null;
             const ratioCard=card(t('insight.share'),ratio===null?t('insight.unmeasured'):'~'+(100*ratio).toFixed(1)+'%');
             if(ratio!==null)ratioCard.append(bar(ratio));
