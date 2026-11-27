@@ -54,6 +54,7 @@ const WI_UI_EN = {
     "entry.sticky": "Sticky for {0} more rounds",
     "entry.message.one": "Message #{0}",
     "entry.message.range": "Messages #{0}–{1}",
+    "entry.message.count": "{0} msgs",
     "reader.dialog": "Lore entry",
     "reader.close": "Close",
     "reader.body": "Lore text (read-only)",
@@ -1855,8 +1856,7 @@ const init = ()=>{
                                     strat.setAttribute('aria-label', wiT('reader.reason.jev'));
                                 }
                             } else if (entry.type == 'mes') {
-                                strat.classList.add('fa-solid', 'fa-fw', 'fa-comments');
-                                strat.setAttribute('data-stwii--count', entry.count.toString());
+                                strat.textContent = wiT('entry.message.count', entry.count);
                             } else if (entry.type == 'note') {
                                 strat.classList.add('fa-solid', 'fa-fw', 'fa-note-sticky');
                             }

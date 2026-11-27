@@ -28,6 +28,7 @@
   "worldInfoInfo.entry.sticky": "Activation maintenue encore {0} tours",
   "worldInfoInfo.entry.message.one": "Message nº {0}",
   "worldInfoInfo.entry.message.range": "Messages nº {0}–{1}",
+  "worldInfoInfo.entry.message.count": "{0} msg",
   "worldInfoInfo.reader.dialog": "Entrée de lore",
   "worldInfoInfo.reader.close": "Fermer",
   "worldInfoInfo.reader.body": "Contenu du lore (lecture seule)",
