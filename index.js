@@ -18,7 +18,7 @@ import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 import { canReplaceReport, persistReport } from './report-storage.js';
 import { createLoreInsight, createInsightTokenCache, insightReason, insightReasonCodes, canShowInsightWorld, requestTextParts, hasCompleteEvidence, verifiedInsightRows } from './lore-insight.mjs';
-import { observePromptAssembly, collectNonactivated, scanSkipReason } from './prompt-inclusion.mjs';
+import { observePromptAssembly } from './prompt-inclusion.mjs';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -100,7 +100,7 @@ const WI_UI_EN = {
     "insight.title": "Lore Insight",
     "insight.waiting": "Checking the actual request…",
     "insight.empty": "No captured RP data in this chat. Generate a reply first.",
-    "insight.note": "Only verified lorebook insertions are counted in the book list and token estimates. Omitted, unverified, and observed nonactivated entries are shown separately. Tap an underlined term to see its meaning. Token counts are estimates; combined and individual totals may differ.",
+    "insight.note": "Only verified lorebook insertions are counted in the book list and token estimates. Only entries whose omission is confirmed are listed as not inserted. Tap an underlined term to see its meaning. Token counts are estimates; combined and individual totals may differ.",
     "insight.activated": "Activated (visible)",
     "insight.matched": "Verified injected lore",
     "insight.unresolved": "Insertion unverified",
@@ -139,22 +139,8 @@ const WI_UI_EN = {
     "insight.evidence.textOnly": "Matching text only",
     "panel.noneVerified": "No verified injected lore",
     "insight.excluded": "Activated but not inserted",
-    "insight.nonactivated": "Not activated in this scan",
-    "insight.nonactivatedLimit": "Only a limited number of nonactivated entries are shown.",
     "insight.excluded.preset": "Disabled preset section",
     "insight.excluded.context": "Omitted during assembly",
-    "insight.skip.disabled": "Disabled",
-    "insight.skip.trigger": "Generation type filter",
-    "insight.skip.character": "Character filter",
-    "insight.skip.tag": "Tag filter",
-    "insight.skip.delay": "Activation delay",
-    "insight.skip.cooldown": "Cooldown",
-    "insight.skip.recursion": "Recursion restriction",
-    "insight.skip.decorator": "Activation blocked",
-    "insight.skip.noKeys": "No keywords",
-    "insight.skip.secondary": "Secondary condition unmet",
-    "insight.skip.probability": "Probability check failed",
-    "insight.skip.notRecorded": "Reason not recorded",
     "insight.explain.evidence.verified": "This entry was traced to the actual pre-send request.",
     "insight.explain.evidence.textOnly": "The same text appears in the request, but its insertion source is unverified.",
     "insight.explain.unmatched": "The captured original text was not found in the request.",
@@ -162,18 +148,6 @@ const WI_UI_EN = {
     "insight.explain.ambiguous": "Repeated or overlapping text prevents unique attribution.",
     "insight.explain.excluded.preset": "The preset's insertion section for this entry is disabled.",
     "insight.explain.excluded.context": "The observed insertion slot was omitted from the final prompt assembly.",
-    "insight.explain.skip.disabled": "The engine treated the entry as disabled in this scan.",
-    "insight.explain.skip.trigger": "The current generation type does not meet the entry's trigger setting.",
-    "insight.explain.skip.character": "The current character is excluded by the entry's character filter.",
-    "insight.explain.skip.tag": "The current character's tags do not meet the entry's tag filter.",
-    "insight.explain.skip.delay": "The configured activation delay is still in effect.",
-    "insight.explain.skip.cooldown": "The entry is waiting for its configured cooldown to end.",
-    "insight.explain.skip.recursion": "The current recursion step does not meet this entry's settings.",
-    "insight.explain.skip.decorator": "An @@dont_activate directive prevented activation.",
-    "insight.explain.skip.noKeys": "The keyword-based entry has no configured keywords.",
-    "insight.explain.skip.secondary": "The secondary keyword condition was not satisfied.",
-    "insight.explain.skip.probability": "The entry did not pass its configured probability check.",
-    "insight.explain.skip.notRecorded": "The entry was observed in the scan but no specific skip reason was recorded.",
     "insight.explain.reason.constant": "The engine activated this entry through its always-active setting.",
     "insight.explain.reason.keyword": "A configured keyword matched the scan text.",
     "insight.explain.reason.vector": "The vector search returned this entry as a match.",
@@ -1289,7 +1263,7 @@ const init = ()=>{
     let currentChatNoteDepth;
     let panelNeedsRender = false;
     let pendingEntries = [];
-    let observedLoreLists=null,promptTrace=null;
+    let promptTrace=null;
     let noteBeforeScan=null;
     function releasePromptTrace(){promptTrace?.release();promptTrace=null;}
     let generationSerial = 0;
@@ -1304,7 +1278,6 @@ const init = ()=>{
     const onWorldInfoEntriesLoaded = (lists) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         jevRecall.consume(lists);
-        observedLoreLists=lists;
         const note=extension_prompts?.['2_floating_prompt']?.value;
         noteBeforeScan=typeof note==='string'&&note.length<=524288?note:null;
     };
@@ -1352,12 +1325,16 @@ const init = ()=>{
                 jev:strategy.jev.split(' ')[0],sticky:'📌',decorator:'🪄',external:'⚡',unknown:'❔'})[reason],
             label:wiT('reader.reason.'+reason),
         })),
-        watchRequest: listener => {
+        watchRequest: (listener, before) => {
             const event=event_types.CHAT_COMPLETION_SETTINGS_READY;
             if(!event)return null;
+            if(typeof eventSource.makeFirst==='function')eventSource.makeFirst(event,before);
             if(typeof eventSource.makeLast==='function')eventSource.makeLast(event,listener);
             else eventSource.on(event,listener);
-            return ()=>eventSource.removeListener?.(event,listener);
+            return ()=>{
+                eventSource.removeListener?.(event,before);
+                eventSource.removeListener?.(event,listener);
+            };
         },
     });
     STWII.loreInsight = insight;
@@ -1459,7 +1436,7 @@ const init = ()=>{
         insightTokens.clear();
         generationType = type;
         releasePromptTrace();
-        observedLoreLists=null;noteBeforeScan=null;
+        noteBeforeScan=null;
         jevRecall.reset();
         realGenerationInProgress = true;
         startWorldInfoConsoleCapture();
@@ -1482,7 +1459,7 @@ const init = ()=>{
         stwiiCurrentLoopEntryIds = null;
         stwiiCurrentLoopEventIds = null;
         stwiiActiveLoopIndex = -1;
-        scanSkipReasons.clear();scanReasonKeyByUid.clear();
+
         // Do not show the previous reply's rows as this reply's insertion.
         renderGenerationEntries([]);
         panel.textContent=wiT('panel.waiting');
@@ -1497,7 +1474,7 @@ const init = ()=>{
         jevRecall.reset();
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
-        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        releasePromptTrace();noteBeforeScan=null;
         tokenGenerationAwaitingEnd = false;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
@@ -1576,12 +1553,8 @@ const init = ()=>{
         try{
             insightCapture=STWII.loreInsight?.beginCapture(serial,chatId,observedActivatedCount);
             captureWiCandidates(candidates,data,insightCapture);
-            if(insightCapture&&(observedActivatedCount!==null||complete)){
-                const skipped=collectNonactivated(observedLoreLists,candidates,scanSkipReasons);
-                insightCapture.nonactivated=skipped.rows;insightCapture.nonactivatedLimited=skipped.limited;
-            }
         }catch{}
-        observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        noteBeforeScan=null;
         pendingEntries=[];jevRecall.reset();
         finalizedTokenGeneration=serial;
         syncTokenFooter();
@@ -1636,7 +1609,7 @@ const init = ()=>{
     // single event callback only schedules work when the opt-in list is open.
     const onCompletedGeneration = () => {
         releaseWorldInfoConsoleCapture();
-        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;
+        releasePromptTrace();noteBeforeScan=null;
         if (!tokenGenerationAwaitingEnd || realGenerationInProgress ||
             finalizedTokenGeneration !== generationSerial) return;
         tokenGenerationAwaitingEnd = false;
@@ -1651,7 +1624,7 @@ const init = ()=>{
         insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
-        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        releasePromptTrace();noteBeforeScan=null;
         renderGenerationEntries([]);
         if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         realGenerationInProgress = false;
@@ -1972,7 +1945,6 @@ function startBuildSession(startedFromScan = false) {
             pendingEntries = [];
             stwiiCurrentLoopEventIds = [];
             stwiiActiveLoopIndex = -1;
-            scanSkipReasons.clear();scanReasonKeyByUid.clear();
         }
         stwiiCurrentBuild = { runId: STWII.currentRunId, startedFromScan, finished: false, finalCount: null, added: [], logs: [] };
     }
@@ -1998,7 +1970,6 @@ function endBuildSession() {
     const vectorActivatedIds = new Set();
     // Track last seen world for a given numeric UID (engine logs sometimes omit the world on follow-up lines)
     const lastWorldByUid = new Map();
-    const scanSkipReasons=new Map(),scanReasonKeyByUid=new Map();
 
     // Build composite key helper "World:UID" or placeholder "?:UID" when world is unknown
     function makeDraftKey(uid, world) {
@@ -2032,22 +2003,8 @@ function endBuildSession() {
         if (!args || args.length === 0) return;
         const a0 = args[0];
 
-        // Read only actual engine skip messages; keep bounded metadata, not
-        // another scan or a guessed reason from saved activation flags.
         const header=typeof args[1]==='string'&&args[1].includes(' processing')?args[2]:null;
-        if(header&&typeof header.world==='string'&&header.uid!=null){
-            const uid=Number(header.uid);
-            lastWorldByUid.set(uid,header.world);
-            if(scanReasonKeyByUid.size<512||scanReasonKeyByUid.has(uid))
-                scanReasonKeyByUid.set(uid,JSON.stringify([header.world,header.uid]));
-        }
-        const skip=scanSkipReason(typeof args[1]==='string'?args[1]:String(a0??''));
-        if(skip){
-            const obj=typeof args[1]==='object'?args[1]:null;
-            const id=obj&&typeof obj.world==='string'&&obj.uid!=null?JSON.stringify([obj.world,obj.uid]):
-                scanReasonKeyByUid.get(parseWiUIDFromFirstArg(a0));
-            if(id&&(scanSkipReasons.size<512||scanSkipReasons.has(id)))scanSkipReasons.set(id,skip);
-        }
+        if(header&&typeof header.world==='string'&&header.uid!=null)lastWorldByUid.set(Number(header.uid),header.world);
 
         // The vector extension reports its own matches before issuing the
         // generic force-activation event. An entry's vectorized flag alone
@@ -2512,7 +2469,7 @@ window.STWII.destroy = function() {
     linkedLoreClickSerial++;
     closeLoreViewer();
     releaseWorldInfoConsoleCapture();
-    releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+    releasePromptTrace();noteBeforeScan=null;
     try {
         const t = window.STWII.trigger;
         if (t && t.parentNode) t.parentNode.removeChild(t);

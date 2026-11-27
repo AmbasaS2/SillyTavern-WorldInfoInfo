@@ -128,7 +128,6 @@ function between(start, end) {
 async function harness() {
     const { canReplaceReport, persistReport } = await api();
     const {createInsightCapture,verifiedInsightRows,hasCompleteEvidence,requestTextParts}=await import('../lore-insight.mjs');
-    const {collectNonactivated,scanSkipReason}=await import('../prompt-inclusion.mjs');
     const metadata = legacyMetadata();
     let pending=null;
     const ctx = vm.createContext({
@@ -140,7 +139,7 @@ async function harness() {
         stwiiActiveLoopIndex: -1, stwiiDryRunActive: false,
         generationSerial: 1, finalizedTokenGeneration: -1, displayedActivationEvents: new WeakMap(),
         world_info_position: { outlet: 7 },main_api:'test',promptTrace:null,observedLoreLists:null,noteBeforeScan:null,
-        releasePromptTrace(){},collectNonactivated,scanSkipReason,hasCompleteEvidence,verifiedInsightRows,
+        releasePromptTrace(){},hasCompleteEvidence,verifiedInsightRows,
         captureWiCandidates(list,data,cap){cap.setPrompt(['test'],null);for(const e of list)cap.add(e,e.content);},
         applyConfirmedWiEntries:cap=>verifiedInsightRows(cap).map(row=>row.entry),
         renderedWiContent: e => e.content, jevRecall: { annotate: e => ({ ...e }), reset() {} },

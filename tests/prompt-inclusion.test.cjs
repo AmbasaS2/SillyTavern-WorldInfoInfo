@@ -60,15 +60,6 @@ test('observing native assembly preserves returns and restores inherited methods
  const {capture,info}=fixture([row(1,7,'value',{outletName:'memory'})],[],[req('value')]);
  assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,1);
 });
-test('nonactivated entries carry only bounded metadata and actual logged reasons',async()=>{
- const {collectNonactivated,scanSkipReason}=await mod();
- const a=entry(1,0),b={...entry(2,0),content:'sensitive text',comment:'skipped',key:['x']};
- const result=collectNonactivated({globalLore:[a,b],characterLore:[b]},[a],new Map([['["Book",2]','cooldown']]));
- assert.equal(result.rows.length,1);assert.equal(result.rows[0].reason,'cooldown');assert.equal('content' in result.rows[0].entry,false);
- assert.equal(scanSkipReason('suppressed by cooldown'),'cooldown');assert.equal(scanSkipReason('activated because of constant'),null);
- assert.equal(collectNonactivated({globalLore:[a,b]},[],null,1).limited,true);
-});
-
 test('unrelated opaque macro or conditional group cannot erase exact depth proof',async()=>{
  const {buildTraceEvidence}=await mod();
  const rows=[row(1,4,'depth memory',{depth:1,role:0})];
