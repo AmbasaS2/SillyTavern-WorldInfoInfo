@@ -7,7 +7,7 @@ const root=path.resolve(__dirname,'..');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 test('ST 1.19.1 real request: strict book/insight membership and lazy rendering', {timeout:300000},async()=>{
  const tmp=fs.mkdtempSync(path.join(os.tmpdir(),'wi-host-ci-')),host=path.join(tmp,'host'),data=path.join(tmp,'data');
- let server,browser,log,failed=true;
+ let server,browser,log,page,failed=true;const errors=[],consoleTail=[];
  const run=(file,args,cwd=tmp)=>execFileSync(file,args,{cwd,stdio:'inherit',timeout:150000});
  try{
   run('git',['clone','--depth','1','--branch','1.19.1','https://github.com/SillyTavern/SillyTavern.git',host]);
@@ -22,12 +22,18 @@ test('ST 1.19.1 real request: strict book/insight membership and lazy rendering'
   fs.cpSync(path.join(root,'i18n'),path.join(dest,'i18n'),{recursive:true});
   const config=path.join(tmp,'config.yaml');fs.copyFileSync(path.join(host,'default/config.yaml'),config);
   const port=18749,url='http://127.0.0.1:'+port;
+  // Bypass only the synthetic profile's first-run username dialog.
+  const settingsPath=path.join(host,'default/content/settings.json'),settings=JSON.parse(fs.readFileSync(settingsPath,'utf8'));
+  settings.firstRun=false;settings.main_api='openai';settings.extension_settings.notifyUpdates=false;
+  settings.extension_settings.autoConnect=false;
+  Object.assign(settings.oai_settings??=( {}),{chat_completion_source:'custom',custom_model:'qa-model',custom_url:url+'/mock/v1',stream_openai:false});
+  fs.writeFileSync(settingsPath,JSON.stringify(settings));
   log=fs.openSync(path.join(tmp,'server.log'),'w');
   server=spawn(process.execPath,['server.js','--configPath',config,'--dataRoot',data,'--port',String(port),'--listen','false','--browserLaunchEnabled','false'],{cwd:host,stdio:['ignore',log,log]});
   for(let i=0;i<100;i++){if(server.exitCode!==null)throw Error('host exited');try{if((await fetch(url)).ok)break;}catch{}await sleep(500);if(i===99)throw Error('host startup timeout');}
   const {chromium}=require(path.join(tmp,'qa/node_modules/playwright-core'));
   browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
-  const page=await browser.newPage({viewport:{width:1280,height:900}}),errors=[],requests=[],consoleTail=[];
+  page=await browser.newPage({viewport:{width:1280,height:900}});const requests=[];
   page.on('pageerror',e=>errors.push(e.message));
   page.on('console',m=>{if(m.type()==='warning'||m.type()==='error'||/\[WI\].*(Adding|DONE)/.test(m.text())){consoleTail.push(m.text().slice(0,240));if(consoleTail.length>30)consoleTail.shift();}});
   let releaseResponse=null;
@@ -44,7 +50,7 @@ test('ST 1.19.1 real request: strict book/insight membership and lazy rendering'
    await route.continue();
   });
   await page.goto(url,{waitUntil:'domcontentloaded'});
-  await page.waitForFunction(()=>window.STWII?.loreInsight&&window.SillyTavern?.getContext?.().characters?.length>0,null,{timeout:60000});
+  await page.waitForFunction(()=>window.STWII?.loreInsight&&window.SillyTavern?.getContext?.().characters?.length>0,null,{timeout:30000});
   const setup=await page.evaluate(async()=>{
    const host=await import('/script.js'),wi=await import('/scripts/world-info.js'),o=await import('/scripts/openai.js');
    await host.selectCharacterById(0,{switchMenu:false});
@@ -129,6 +135,10 @@ test('ST 1.19.1 real request: strict book/insight membership and lazy rendering'
   console.log('Host QA browser errors',JSON.stringify(errors));
   assert.equal(errors.length,0);
   failed=false;
- }catch(e){if(fs.existsSync(path.join(tmp,'server.log')))console.log('Server log tail',fs.readFileSync(path.join(tmp,'server.log'),'utf8').split('\n').slice(-55).join('\n'));throw e;}
+ }catch(e){
+  console.log('Browser diagnostic',JSON.stringify({errors,consoleTail,view:page?await page.evaluate(()=>({ready:document.readyState,context:!!window.SillyTavern?.getContext,chars:window.SillyTavern?.getContext?.().characters?.length,wii:!!window.STWII?.loreInsight,body:document.body.innerText.slice(0,700)})).catch(()=>null):null}));
+  if(fs.existsSync(path.join(tmp,'server.log')))console.log('Server log tail',fs.readFileSync(path.join(tmp,'server.log'),'utf8').split('\n').slice(-30).join('\n'));
+  throw e;
+ }
  finally{if(browser)await browser.close().catch(()=>{});if(server)server.kill();if(log!==undefined)fs.closeSync(log);if(!failed)fs.rmSync(tmp,{recursive:true,force:true});}
 });
