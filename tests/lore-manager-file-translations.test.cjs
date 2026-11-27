@@ -128,5 +128,8 @@ test('viewer-only integration retains legacy and RT fallback; no background poll
     assert.match(index, /linkLoreLibrary === true/);
     assert.doesNotMatch(helper, /MutationObserver|ResizeObserver|setInterval|setTimeout|localStorage|POST|PUT/);
     assert.doesNotMatch(manager, /MutationObserver|ResizeObserver|setInterval|setTimeout/);
-    assert.equal(JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version, '1.7.1-ambasa.9');
+    // This integration was introduced in .9; later builds retain it.
+    const version = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')).version;
+    const revision = /^1\.7\.1-ambasa\.(\d+)$/.exec(version);
+    assert.ok(revision && Number(revision[1]) >= 9, `Unexpected integration version: ${version}`);
 });
