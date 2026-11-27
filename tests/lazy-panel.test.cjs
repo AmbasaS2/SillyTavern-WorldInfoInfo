@@ -85,7 +85,7 @@ test('unrelated idle generation stop preserves the last verified display and dia
         syncTokenFooter() { calls.push('footer'); },
     });
     vm.runInContext(extract('    const onGenerationStopped = () => {',
-        '    eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);') +
+        '    const onUnscopedStopped = () => {') +
         '\nthis.stop = onGenerationStopped;', context);
     context.stop();
     assert.equal(calls.length, 0);
@@ -119,7 +119,7 @@ test('unrelated completion cannot release an in-progress visible reply capture',
         scheduleTokenSummary() { calls.push('count'); },
     });
     vm.runInContext(extract('    const onCompletedGeneration = () => {',
-        '    eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);') +
+        '    // Only a real assistant message') +
         '\nthis.complete = onCompletedGeneration;', context);
     context.complete();
     assert.deepEqual(calls, []);
@@ -183,4 +183,39 @@ test('failed optional token count can retry on reopen, successful count is reuse
     context.scheduleTokenSummary();
     assert.equal(pending.length, 0);
     assert.equal(calls, 2);
+});
+
+test('quiet starts never claim a visible scan; ambiguous assembly is dropped',()=>{
+    const calls=[];
+    const context=vm.createContext({
+        realGenerationInProgress:false,tokenGenerationAwaitingEnd:true,backgroundOverlap:false,
+        onGenerationStopped(){calls.push('discard capture');},
+    });
+    // The early return is the only path exercised by background starts.
+    vm.runInContext(extract('    const beginRealGeneration = (type, options, dryRun) => {',
+        '        generationSerial++;')+'\n};\nthis.begin=beginRealGeneration;',context);
+    context.begin('quiet',{},true);
+    assert.equal(context.backgroundOverlap,false);
+    context.begin('quiet',{},false);
+    assert.equal(context.backgroundOverlap,true);
+    assert.deepEqual(calls,[]);
+    context.backgroundOverlap=false;
+    context.realGenerationInProgress=true;
+    context.begin('quiet',{},false);
+    assert.deepEqual(calls,['discard capture']);
+});
+test('unscoped quiet completion cannot finish or clear a visible reply',()=>{
+    const calls=[];
+    const context=vm.createContext({backgroundOverlap:true,chat:[{is_user:true},{is_user:false}],
+        onCompletedGeneration(){calls.push('complete');},onGenerationStopped(){calls.push('stop');}});
+    vm.runInContext(extract('    const onUnscopedCompletion = () => {',
+        '    eventSource.on(event_types.GENERATION_ENDED, onUnscopedCompletion);')+
+        extract('    const onUnscopedStopped = () => {','    eventSource.on(event_types.GENERATION_STOPPED, onUnscopedStopped);')+
+        '\nthis.complete=onUnscopedCompletion;this.message=onVisibleMessageReceived;this.stop=onUnscopedStopped;',context);
+    context.complete();context.stop();context.message(0,'normal');context.message(1,'first_message');
+    assert.deepEqual(calls,[]);
+    context.message(1,'normal');
+    assert.deepEqual(calls,['complete']);
+    context.backgroundOverlap=false;context.complete();context.stop();
+    assert.deepEqual(calls,['complete','complete','stop']);
 });
