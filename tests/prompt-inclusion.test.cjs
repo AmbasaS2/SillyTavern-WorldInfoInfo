@@ -55,6 +55,7 @@ test('observing native assembly preserves returns and restores inherited methods
  const prompts=manager.getPromptCollection('normal');
  const root={getCollection:()=>[{identifier:'main',getCollection:()=>[{identifier:'main',role:'system',content:prompts.collection[0].content}]}]};
  assert.equal(manager.setChatCompletion({getMessages:()=>root}),42);
+ assert.equal(manager.preparePrompt,original.preparePrompt);
  const trace=observer.take();
  assert.equal(manager.preparePrompt,original.preparePrompt);assert.equal(Object.hasOwn(manager,'preparePrompt'),false);
  const {capture,info}=fixture([row(1,7,'value',{outletName:'memory'})],[],[req('value')]);

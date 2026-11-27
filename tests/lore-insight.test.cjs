@@ -172,6 +172,7 @@ function fakeDocument(){
  const body=new El('body');return {body,activeElement:null,createElement:tag=>new El(tag)};
 }
 const tick=()=>new Promise(r=>setTimeout(r,15));
+function expand(section){section.open=true;section.handlers.toggle?.();return section;}
 test('live dialog publishes only verified request entries before completion and reuses counts',async()=>{
  const {createLoreInsight,verifiedInsightRows}=await mod();const old=global.document;global.document=fakeDocument();
  try{
@@ -190,7 +191,7 @@ test('live dialog publishes only verified request entries before completion and 
   second.content='Modified.';listener({type:'normal',messages:[first,second,oldChat]});assert.equal(listener,null);
   await tick();assert.deepEqual(finals,[[1]]);assert.ok(calls.includes('Present.\n'));assert.ok(!calls.includes('Absent.\n'));assert.ok(!calls.includes('Never present.\n'));
   const sections=document.body.walk().filter(x=>x.dataset.insightSection==='matched'||x.dataset.insightSection==='unresolved'||x.dataset.insightSection==='nonactivated');
-  assert.equal(sections.length,3);assert.match(sections[0].textContent,/Present entry/);assert.doesNotMatch(sections[0].textContent,/Removed entry|Outlet entry|Not activated/);
+  assert.equal(sections.length,3);assert.ok(sections.every(s=>s.childElementCount===1));sections.forEach(expand);assert.match(sections[0].textContent,/Present entry/);assert.doesNotMatch(sections[0].textContent,/Removed entry|Outlet entry|Not activated/);
   assert.match(sections[1].textContent,/Removed entry/);assert.match(sections[1].textContent,/reader.route.outlet/);assert.match(sections[2].textContent,/Not activated/);assert.match(sections[2].textContent,/insight.skip.cooldown/);assert.match(document.body.textContent,/insight.source.request/);
   const count=calls.length;insight.ready();await tick();assert.equal(calls.length,count);
   insight.close();insight.open();await tick();assert.equal(calls.length,count);
@@ -231,7 +232,9 @@ test('STLO consumer publishes structural evidence when closed and counts only wh
   assert.equal(publications[0].complete,true);
   insight.open();await tick();
   assert.equal(calls.length,1);assert.equal(local,2);assert.equal(publications.length,2);
-  assert.match(insight.selectionFor(a),/adaptive-role/);assert.match(document.body.textContent,/insight.jev.score/);
+  assert.match(insight.selectionFor(a),/adaptive-role/);
+  for(const section of document.body.walk().filter(x=>['matched','unresolved'].includes(x.dataset.insightSection)))expand(section);
+  assert.match(document.body.textContent,/insight.jev.score/);
   assert.match(document.body.textContent,/insight.evidence.summary/);
   const entries=document.body.walk().filter(x=>x.className==='stwii--insight-entry');
   assert.match(entries.find(x=>x.textContent.includes('Jev scene')).textContent,/insight.evidence.verified/);
@@ -243,6 +246,9 @@ test('STLO consumer publishes structural evidence when closed and counts only wh
   assert.ok(budget);const help=jevRow.walk().find(x=>x.className==='stwii--insight-term-help');
   budget.handlers.click();assert.equal(help.hidden,false);assert.equal(help.textContent,'insight.explain.jev.accepted');
   budget.handlers.click();assert.equal(help.hidden,true);
+  const rowBefore=jevRow;const countBefore=calls.length;
+  expand(document.body.walk().find(x=>x.dataset.insightSection==='matched'));
+  assert.ok(document.body.walk().includes(rowBefore));assert.equal(calls.length,countBefore);
   assert.equal(publications[1].records[1].status,'unknown');insight.clear();
  }finally{global.document=old;}
 });
@@ -271,6 +277,33 @@ test('actual membership excludes text-only hits, inactive entries and prior asse
  assert.equal(inspectInsight(cap)[2].status,'excluded');
  const calls=[];await estimateInsight(inspectInsight(cap),cap,async s=>{calls.push(s);return s.length},()=>true,true);
  assert.ok(calls.includes('Real.\n'));assert.ok(!calls.includes('Same text.\n'));assert.ok(!calls.includes('Disabled block.\n'));
- cap.setPrompt(['Same text.'],null,'request');cap.proven.set('["Book",1]','Real.\n');
+ cap.setPrompt(['Same text.'],null,'request');
+ // Proof records are produced only by the correlated request confirmer.
  assert.equal(verifiedInsightRows(cap).length,0);
+});
+
+test('closed disclosure creates no rows, automatic token updates preserve expanded DOM and help',async()=>{
+ const {createLoreInsight}=await mod();const old=global.document;global.document=fakeDocument();
+ try{
+  let listener,resolve;
+  const insight=createLoreInsight({t:k=>k,countText:()=>new Promise(r=>{resolve=r}),getScope:()=> 'scope',getChatId:()=> 'chat',getReason:()=> 'constant',titleFor:e=>e.comment,isVisible:()=>true,reasonLabel:r=>r,watchRequest:fn=>{listener=fn;return()=>{listener=null;}}});
+  insight.start();
+  const msg={role:'system',content:'Real.'},cap=insight.beginCapture(1,'chat',1);
+  cap.setPrompt(['Real.'],null);cap.add({...entry(1),position:0,order:1,comment:'Real entry'},'Real.');
+  cap.nonactivated=Array.from({length:100},(_,i)=>({entry:{...entry(i+2),comment:'skip '+i},reason:'cooldown'}));
+  const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...msg,identifier:'worldInfoBefore'}]}]};
+  insight.finish(cap,true,{messages:[msg],type:'normal',structure,beforePosition:0,formatWorldInfo:s=>s});
+  listener({type:'normal',messages:[msg]});insight.open();
+  const matched=document.body.walk().find(x=>x.dataset.insightSection==='matched');
+  const skipped=document.body.walk().find(x=>x.dataset.insightSection==='nonactivated');
+  assert.equal(matched.childElementCount,1);assert.equal(skipped.childElementCount,1);
+  expand(matched);const row=matched.children[1],term=row.walk().find(x=>x.tagName==='button'&&x.textContent==='insight.evidence.verified');
+  term.handlers.click();await tick();
+  for(let i=0;i<3;i++){resolve(5);await tick();}
+  assert.equal(matched.children[1],row);assert.equal(skipped.childElementCount,1);
+  assert.equal(row.walk().find(x=>x.className==='stwii--insight-entry-tokens').textContent,'~5 T');
+  assert.equal(row.walk().find(x=>x.className==='stwii--insight-term-help').hidden,false);
+  expand(skipped);assert.equal(skipped.childElementCount,101);expand(skipped);assert.equal(skipped.childElementCount,101);
+  insight.clear();
+ }finally{global.document=old;}
 });

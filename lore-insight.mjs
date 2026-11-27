@@ -141,7 +141,27 @@ export function getInsightRows(capture){
     return capture.inspection??(capture.inspection=inspectInsight(capture));
 }
 export function verifiedInsightRows(capture){
-    return capture?.source==='request'?getInsightRows(capture).filter(row=>row.sourceVerified):[];
+    if(capture?.source!=='request'||capture.promptLimited)return [];
+    if(capture.inspection)return capture.inspection.filter(row=>row.sourceVerified);
+    const result=[],seen=new Set();
+    for(const row of capture.rows){
+        const id=metricsKey(row.entry);
+        if(seen.has(id))continue;
+        seen.add(id);
+        if(row.text.trim()&&capture.proven?.get(id)===row.text+'\n')
+            result.push({...row,sourceVerified:true,status:'matched',tokens:null});
+    }
+    return result;
+}
+export function hasCompleteEvidence(capture){
+    if(capture?.source!=='request'||capture.truncated||capture.promptLimited)return false;
+    const ids=new Set();
+    for(const row of capture.rows){
+        const id=metricsKey(row.entry);
+        if(ids.has(id))return false;ids.add(id);
+        if(!(row.text.trim()&&capture.proven?.get(id)===row.text+'\n')&&!capture.excluded?.has(id))return false;
+    }
+    return true;
 }
 
 export function insightReasonCodes(entry,ev) {
@@ -278,8 +298,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         if(requestInfo&&typeof watchRequest==='function'){
             const matches=createRequestMatcher(requestInfo.messages,requestInfo.type);
             const traced=buildTraceEvidence(capture,requestInfo,requestInfo.trace);
-            const fallback=buildStructuredProof(capture,requestInfo);
-            const structural=[...traced.blocks,...fallback];
+            const structural=requestInfo.trace?traced.blocks:buildStructuredProof(capture,requestInfo);
             const assembled=Array.isArray(requestInfo.messages)&&requestInfo.messages.length<=4096?
                 requestInfo.messages.map(message=>({message,content:message?.content,role:message?.role,name:message?.name||''})):null;
             try{
@@ -297,7 +316,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
                     }catch{}
                     stopWatching();accept(capture);
                 });
-                if(typeof releaseRequest==='function'){refresh();return;}
+                if(typeof releaseRequest==='function')return;
             }catch{stopWatching();}
         }
         accept(capture);
@@ -353,6 +372,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             row.tokens=saved?.tokens.get(JSON.stringify([row.entry.world,row.entry.uid]))??null;
         }
         let measurement=saved?.result??null,busy=false;
+        const numberUpdates=[];
         const report=element('div','stwii--insight-report');
         const status=element('div','stwii--insight-status');status.setAttribute('aria-live','polite');
         const hint=element('details','stwii--insight-help');
@@ -363,32 +383,33 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         body.append(report,status,hint);
         if(!sameScope)body.append(element('p','stwii--insight-note',t('insight.scopeChanged')));
         function card(label,value){
-            const node=element('div','stwii--insight-card');
-            node.append(element('small','',label),element('strong','',value));return node;
+            const node=element('div','stwii--insight-card'),number=element('strong','',value());
+            node.append(element('small','',label),number);
+            numberUpdates.push(()=>{number.textContent=value();});
+            return node;
         }
         function bar(fraction){
             const track=element('div','stwii--insight-bar');track.setAttribute('aria-hidden','true');
             const fill=element('div','stwii--insight-bar-fill');
-            fill.style.width=(100*Math.min(1,Math.max(0,fraction))).toFixed(2)+'%';
-            track.append(fill);return track;
+            const update=()=>{const f=fraction();track.hidden=f===null;fill.style.width=(100*Math.min(1,Math.max(0,f??0))).toFixed(2)+'%';};
+            track.append(fill);update();numberUpdates.push(update);return track;
         }
         function groupSection(label,key,display){
             const section=element('section','stwii--insight-section');
             section.append(element('h4','',label));
-            const groups=new Map(),allMeasured=matched.length>0&&matched.every(r=>validCount(r.tokens));
-            const sum=allMeasured?matched.reduce((n,r)=>n+r.tokens,0):0;
+            const groups=new Map();
             for(const row of matched){
                 const k=key(row);
-                if(!groups.has(k))groups.set(k,{count:0,measured:0,tokens:0});
-                const g=groups.get(k);g.count++;
-                if(validCount(row.tokens)){g.tokens+=row.tokens;g.measured++;}
+                if(!groups.has(k))groups.set(k,[]);
+                groups.get(k).push(row);
             }
-            for(const [k,g] of groups){
-                const value=g.count===g.measured?formatted(g.tokens):t('insight.unmeasured');
-                const line=element('div','stwii--insight-line');
-                line.append(element('span','',display(k)),element('small','',t('insight.count',g.count)),element('strong','',value));
-                section.append(line);
-                if(sum>0)section.append(bar(g.tokens/sum));
+            const sum=()=>matched.length&&matched.every(r=>validCount(r.tokens))?matched.reduce((n,r)=>n+r.tokens,0):0;
+            for(const [k,group] of groups){
+                const total=()=>group.every(r=>validCount(r.tokens))?group.reduce((n,r)=>n+r.tokens,0):null;
+                const line=element('div','stwii--insight-line'),value=element('strong','',formatted(total()));
+                line.append(element('span','',display(k)),element('small','',t('insight.count',group.length)),value);
+                section.append(line);numberUpdates.push(()=>{value.textContent=formatted(total());});
+                section.append(bar(()=>{const all=sum();return all>0&&total()!==null?total()/all:null;}));
             }
             if(!groups.size)section.append(element('p','stwii--insight-note',t('insight.noMatches')));
             return section;
@@ -419,7 +440,10 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             const detail=element('details','stwii--insight-section stwii--insight-details');
             detail.dataset.insightSection=key;detail.open=opened.has(key);
             detail.append(element('summary','',t(label)+' · '+list.length+(inactive&&capture.nonactivatedLimited?'+':'')));
-            for(const row of list){
+            let built=false;
+            function build(){
+                if(built)return;built=true;
+                for(const row of list){
                 const line=element('div','stwii--insight-entry');
                 const copy=element('div','stwii--insight-entry-copy');
                 const term=termControl(copy,key+':'+metricsKey(row.entry));
@@ -440,33 +464,35 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
                     row.status==='excluded'?'excluded.'+row.exclusion:row.status==='matched'?'evidence.textOnly':row.status;
                 terms.append(term.button(evidence,t('insight.'+evidence)));
                 copy.append(terms);term.finish();line.append(copy);
-                if(verified)line.append(element('span','stwii--insight-entry-tokens',formatted(row.tokens)));
+                if(verified){
+                    const token=element('span','stwii--insight-entry-tokens',formatted(row.tokens));
+                    line.append(token);numberUpdates.push(()=>{token.textContent=formatted(row.tokens);});
+                }
                 detail.append(line);
+                }
             }
+            detail.addEventListener('toggle',()=>{if(detail.open)build();});
+            if(detail.open)build();
             return detail;
         }
-        function paint(){
-            const opened=new Set([...report.querySelectorAll('details[open]')].map(d=>d.dataset.insightSection));
-            if(!report.childElementCount)for(const key of expanded)opened.add(key);
-            report.replaceChildren();
-            const grid=element('div','stwii--insight-grid');
-            grid.append(card(t('insight.matched'),t('insight.count',matched.length)),card(t('insight.total'),formatted(measurement?.total)));
-            report.append(grid);
-            if(excluded.length||unresolved.length)
-                report.append(element('p','stwii--insight-note',t('insight.evidence.summary',excluded.length,unresolved.length)));
-            const ratio=measurement?.prompt>0&&validCount(measurement.total)&&measurement.total<=measurement.prompt?measurement.total/measurement.prompt:null;
-            const ratioCard=card(t('insight.share'),ratio===null?t('insight.unmeasured'):'~'+(100*ratio).toFixed(1)+'%');
-            if(ratio!==null)ratioCard.append(bar(ratio));
-            report.append(ratioCard);
-            if(!allVisible)report.append(element('p','stwii--insight-note',t('insight.visible')));
-            if(capture.truncated||capture.promptLimited||measurement?.limited)report.append(element('p','stwii--insight-note',t('insight.limit')));
-            report.append(groupSection(t('insight.books'),r=>String(r.entry.world??''),s=>s),groupSection(t('insight.reasons'),r=>r.reason,reasonLabel));
-            report.append(entrySection('insight.entries','matched',matched,true,opened));
-            if(excluded.length)report.append(entrySection('insight.excluded','excluded',excluded,false,opened));
-            if(unresolved.length)report.append(entrySection('insight.unresolved','unresolved',unresolved,false,opened));
-            if(nonactivated.length)report.append(entrySection('insight.nonactivated','nonactivated',nonactivated,false,opened,true));
-            if(capture.nonactivatedLimited)report.append(element('p','stwii--insight-note',t('insight.nonactivatedLimit')));
-        }
+        function ratio(){return measurement?.prompt>0&&validCount(measurement.total)&&measurement.total<=measurement.prompt?measurement.total/measurement.prompt:null;}
+        function totalLabel(){return formatted(measurement?.total);}
+        function ratioLabel(){const r=ratio();return r===null?t('insight.unmeasured'):'~'+(100*r).toFixed(1)+'%';}
+        const grid=element('div','stwii--insight-grid');
+        grid.append(card(t('insight.matched'),()=>t('insight.count',matched.length)),card(t('insight.total'),totalLabel));
+        report.append(grid);
+        if(excluded.length||unresolved.length)report.append(element('p','stwii--insight-note',t('insight.evidence.summary',excluded.length,unresolved.length)));
+        const ratioCard=card(t('insight.share'),ratioLabel);ratioCard.append(bar(ratio));report.append(ratioCard);
+        if(!allVisible)report.append(element('p','stwii--insight-note',t('insight.visible')));
+        const limitNote=element('p','stwii--insight-note',t('insight.limit'));
+        const updateLimit=()=>{limitNote.hidden=!(capture.truncated||capture.promptLimited||measurement?.limited);};
+        updateLimit();numberUpdates.push(updateLimit);report.append(limitNote);
+        report.append(groupSection(t('insight.books'),r=>String(r.entry.world??''),s=>s),groupSection(t('insight.reasons'),r=>r.reason,reasonLabel));
+        report.append(entrySection('insight.entries','matched',matched,true,expanded));
+        if(excluded.length)report.append(entrySection('insight.excluded','excluded',excluded,false,expanded));
+        if(unresolved.length)report.append(entrySection('insight.unresolved','unresolved',unresolved,false,expanded));
+        if(nonactivated.length)report.append(entrySection('insight.nonactivated','nonactivated',nonactivated,false,expanded,true));
+        if(capture.nonactivatedLimited)report.append(element('p','stwii--insight-note',t('insight.nonactivatedLimit')));
         const sameView=()=>current===view&&view.revision===revision&&latest===capture&&getChatId()===capture.chatId;
         const stillCurrent=()=>sameView()&&readScope()===scope;
         function updateStatus(){
@@ -493,11 +519,11 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             }catch{
                 if(stillCurrent()){measurement={total:null,prompt:null,failed:true};for(const row of rows)row.tokens=null;}
             }finally{
-                if(stillCurrent()){busy=false;updateStatus();paint();}
+                if(stillCurrent()){busy=false;updateStatus();for(const update of numberUpdates)update();}
                 else if(sameView())refresh();
             }
         }
-        paint();updateStatus();
+        updateStatus();
         // Opening is the opt-in. One deferred job; no watcher or polling.
         // Prompt dispatch never awaits the token estimate.
         if(sameScope&&matched.length&&!measurement){

@@ -42,9 +42,9 @@ function extensionSnapshot(value){
 
 // Capture the pre-squash message hierarchy (native PromptManager discards
 // identifiers during squashing), and the actual prepared in-chat prompts.
-export function observePromptAssembly(manager,readExtensions,type){
+export function observePromptAssembly(manager,readExtensions,type,noteBase=null){
     if(!manager||!['getPromptCollection','preparePrompt','setChatCompletion'].every(k=>typeof manager[k]==='function'))return null;
-    const restorers=[];let active=true,collection=null,prepared=new WeakMap(),history=new Map(),chars=0,limited=false,latest=null,noteBase=null;
+    const restorers=[];let active=true,collection=null,prepared=new WeakMap(),history=new Map(),chars=0,limited=false,latest=null;
     function wrap(name,after,before){
         const own=Object.getOwnPropertyDescriptor(manager,name),original=manager[name];
         if(own&&!own.configurable)throw Error('Unsupported prompt manager');
@@ -96,9 +96,9 @@ export function observePromptAssembly(manager,readExtensions,type){
                 disabledAfter:manager.isPromptDisabledForActiveCharacter?.('worldInfoAfter')===true,
                 squashed:manager.serviceSettings?.squash_system_messages===true,
                 continuePrefill:manager.serviceSettings?.continue_prefill===true,type};
+            release();
         });
         return {
-            note(){try{const value=readExtensions()?.['2_floating_prompt']?.value;noteBase=isText(value)&&value.length<=CHARS?value:null;}catch{}},
             take(){const result=latest;release();latest=null;return result;},
             release(){release();latest=null;},
         };

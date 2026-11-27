@@ -17,7 +17,7 @@ import { tryOpenInLoreLibrary } from './lore-library-link.js';
 import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 import { canReplaceReport, persistReport } from './report-storage.js';
-import { createLoreInsight, createInsightTokenCache, insightReason, insightReasonCodes, canShowInsightWorld, requestTextParts, getInsightRows, verifiedInsightRows } from './lore-insight.mjs';
+import { createLoreInsight, createInsightTokenCache, insightReason, insightReasonCodes, canShowInsightWorld, requestTextParts, hasCompleteEvidence, verifiedInsightRows } from './lore-insight.mjs';
 import { observePromptAssembly, collectNonactivated, scanSkipReason } from './prompt-inclusion.mjs';
 
 
@@ -1290,6 +1290,7 @@ const init = ()=>{
     let panelNeedsRender = false;
     let pendingEntries = [];
     let observedLoreLists=null,promptTrace=null;
+    let noteBeforeScan=null;
     function releasePromptTrace(){promptTrace?.release();promptTrace=null;}
     let generationSerial = 0;
     let realGenerationInProgress = false;
@@ -1304,7 +1305,8 @@ const init = ()=>{
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         jevRecall.consume(lists);
         observedLoreLists=lists;
-        promptTrace?.note();
+        const note=extension_prompts?.['2_floating_prompt']?.value;
+        noteBeforeScan=typeof note==='string'&&note.length<=524288?note:null;
     };
     const resetJevRecall = () => jevRecall.reset();
     eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
@@ -1457,8 +1459,7 @@ const init = ()=>{
         insightTokens.clear();
         generationType = type;
         releasePromptTrace();
-        observedLoreLists=null;
-        if(main_api==='openai')promptTrace=observePromptAssembly(promptManager,()=>extension_prompts,type);
+        observedLoreLists=null;noteBeforeScan=null;
         jevRecall.reset();
         realGenerationInProgress = true;
         startWorldInfoConsoleCapture();
@@ -1496,7 +1497,7 @@ const init = ()=>{
         jevRecall.reset();
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
-        releasePromptTrace();observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
         tokenGenerationAwaitingEnd = false;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
@@ -1553,6 +1554,10 @@ const init = ()=>{
                 return snapshot;
             });
         pendingEntries = filtered;
+        // Native assembly starts after this event; no temporary hooks during
+        // the scan or Jev requests, or when there are no candidates to verify.
+        releasePromptTrace();
+        if(filtered.length&&main_api==='openai')promptTrace=observePromptAssembly(promptManager,()=>extension_prompts,generationType,noteBeforeScan);
         // Never publish scan candidates, even for ordinary or constant lore.
     };
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, onWorldInfoActivated);
@@ -1576,7 +1581,7 @@ const init = ()=>{
                 insightCapture.nonactivated=skipped.rows;insightCapture.nonactivatedLimited=skipped.limited;
             }
         }catch{}
-        observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
         pendingEntries=[];jevRecall.reset();
         finalizedTokenGeneration=serial;
         syncTokenFooter();
@@ -1602,9 +1607,7 @@ const init = ()=>{
             const added=(captured?.added??[]).filter(ev=>ids.has(String(ev.world)+':'+String(ev.uid)))
                 .map(ev=>jevIds.has(String(ev.world)+':'+String(ev.uid))
                     ?{...ev,jevConfirmed:true,logic:'JEV',reason:'jev',primary:null,secondary:[],vectorConfirmed:false}:ev);
-            const rows=getInsightRows(capture);
-            const reportComplete=complete&&capture?.source==='request'&&!capture.truncated&&!capture.promptLimited&&
-                rows.length===candidates.length&&rows.every(row=>row.sourceVerified||row.status==='excluded');
+            const reportComplete=complete&&capture?.rows.length===candidates.length&&hasCompleteEvidence(capture);
             const originalLoops=build?.loopEntryIds;
             const loopEntryIds=Array.isArray(originalLoops)&&originalLoops.every(Array.isArray)
                 ?originalLoops.map(group=>group.filter(id=>ids.has(id))):[];
@@ -1633,6 +1636,7 @@ const init = ()=>{
     // single event callback only schedules work when the opt-in list is open.
     const onCompletedGeneration = () => {
         releaseWorldInfoConsoleCapture();
+        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;
         if (!tokenGenerationAwaitingEnd || realGenerationInProgress ||
             finalizedTokenGeneration !== generationSerial) return;
         tokenGenerationAwaitingEnd = false;
@@ -1647,7 +1651,7 @@ const init = ()=>{
         insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
-        releasePromptTrace();observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
         renderGenerationEntries([]);
         if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         realGenerationInProgress = false;
@@ -2508,7 +2512,7 @@ window.STWII.destroy = function() {
     linkedLoreClickSerial++;
     closeLoreViewer();
     releaseWorldInfoConsoleCapture();
-    releasePromptTrace();observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+    releasePromptTrace();observedLoreLists=null;noteBeforeScan=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
     try {
         const t = window.STWII.trigger;
         if (t && t.parentNode) t.parentNode.removeChild(t);
