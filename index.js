@@ -96,30 +96,33 @@ const WI_UI_EN = {
     "settings.insight.label": "View Lore Insight",
     "settings.insight.hint": "Inspect the latest RP lore and token estimates.",
     "insight.title": "Lore Insight",
-    "insight.waiting": "Available after the current reply finishes.",
+    "insight.waiting": "Preparing the generation request…",
     "insight.empty": "No captured RP data in this chat. Generate a reply first.",
-    "insight.note": "Text matches are evidence, not proof of lore provenance or provider usage. Repeated or overlapping text is ambiguous. Grouped tokens sum individual estimates.",
+    "insight.note": "Confirmed lore means captured text was found in the request; this is evidence, not exact entry provenance or API usage. Repeated, overlapping or missing text is unverified. Outlets can activate without being used. The total estimates combined text; group totals sum individual estimates and can differ slightly.",
     "insight.activated": "Activated (visible)",
-    "insight.matched": "Text matched",
-    "insight.unresolved": "Not verified",
-    "insight.total": "Matched text · combined estimate",
-    "insight.share": "Matched lore / captured prompt text",
+    "insight.matched": "Lore found in request",
+    "insight.unresolved": "Unverified lore",
+    "insight.total": "Lore token estimate",
+    "insight.share": "Share of input text",
     "insight.unmeasured": "Not measured",
-    "insight.unmatched": "Text not found",
+    "insight.unmatched": "Not found in request",
     "insight.unknown": "Unverified",
     "insight.ambiguous": "Ambiguous match",
     "insight.measure": "Calculate token estimates",
-    "insight.counting": "Counting…",
+    "insight.counting": "Estimating tokens…",
     "insight.measured": "Token estimates calculated",
-    "insight.books": "By lorebook · matched / activated",
-    "insight.reasons": "By activation reason · matched / activated",
-    "insight.entries": "Lore entries",
+    "insight.books": "By lorebook",
+    "insight.reasons": "By activation reason",
+    "insight.entries": "Included lore",
     "insight.visible": "Hidden lore excluded. Full-prompt ratio is not calculated.",
     "insight.limit": "Capture or detail limit reached. Values may be partial; unmeasured values are not zero.",
     "insight.multiple": "Multiple recorded reasons",
     "insight.source.assembled": "Evidence: assembled prompt",
     "insight.source.request": "Evidence: pre-send request messages",
     "insight.scopeChanged": "Tokenizer or generation context changed. Generate a new reply to measure.",
+    "insight.help": "About these estimates",
+    "insight.count": "{0} entries",
+    "insight.noMatches": "No lore text confirmed.",
     "insight.retry": "Retry missing estimates"
 };
 function wiT(key, ...values) {
@@ -719,7 +722,7 @@ function confirmedWiEntries(entryList, generationData, insightCapture = null) {
         // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
         // 'No active entries' for ordinary (non-outlet) entries.
         const rendered = renderedWiContent(entry);
-        try{insightCapture?.add(entry,rendered);}catch{}
+        try{insightCapture?.add(entry,rendered,entry.position === world_info_position.outlet);}catch{}
         if (!rendered) return false;
         if (entry.position !== world_info_position.outlet) return true;
 
@@ -1495,8 +1498,8 @@ const init = ()=>{
         // otherwise keep the already-built DOM and instant button response.
         renderGenerationEntries(included);
         finalizedTokenGeneration = generationSerial;
-        // GENERATE_AFTER_DATA runs BEFORE the model replies. Do not tokenize
-        // while the request is being sent or while its response is streaming.
+        // The legacy footer still waits for completion. Lore Insight can
+        // calculate during streaming when the user opens it.
         syncTokenFooter();
 
         // Keep the complete current report in RAM. Only a verified scan
@@ -1527,6 +1530,21 @@ const init = ()=>{
         }
         for (const entry of included) {
             displayedActivationEvents.set(entry, eventsById.get(String(entry.world) + ':' + String(entry.uid)) ?? null);
+        }
+        // Explain activated but unverified outlets using captured events without
+        // adding them to the legacy list/report.
+        if (insightCapture) {
+            const includedSet = new Set(included);
+            const unmatchedById = new Map(insightCapture.rows.filter(row => !includedSet.has(row.entry))
+                .map(row => [String(row.entry.world) + ':' + String(row.entry.uid), row.entry]));
+            for (const ev of captured?.added ?? []) {
+                const key = String(ev.world) + ':' + String(ev.uid);
+                const entry = unmatchedById.get(key);
+                if (entry) {
+                    displayedActivationEvents.set(entry, ev);
+                    unmatchedById.delete(key);
+                }
+            }
         }
         try {
             persistReport(chat_metadata, lastLiveReport, complete);

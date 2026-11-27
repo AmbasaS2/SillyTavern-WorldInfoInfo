@@ -15,3 +15,6 @@ Captured tokenizer context must match the current context; invalidated in-flight
 
 ## Early-use master update: 1.7.1-ambasa.11
 User approved early use on master after the 54/54 Node and ST 1.19.1 synthetic generation / Chrome 1280 and 390px Dark Lite validation of 921ce25. This supersedes the earlier merge hold for standalone use only. Full joint STLO integration and local Work regression remain gates for the final coordinated update; no release archive or installation action is implied. Rollback commit: 342e92e453f88fb2e63b847e96fe49a23d9d0ac8.
+
+## 1.7.1-ambasa.12 · Live compact Lore Insight
+Publish assembled evidence immediately and refresh an open dialog on correlated pre-send evidence. Completion does not restart measurement. Opening opts in to one deferred token-estimate job; no counting while closed except an already-started host call may finish. Close/chat change/new run invalidates further work. Unverified activated items are separated from matched totals. Outlet route/name are shown and exact captured raw-body fallback is allowed only when nonempty rendered outlet text was not found; this remains text evidence, not unique attribution. Group bars use complete per-entry sums; overall share uses combined estimate. No settings/storage changes. STLO joint validation pending. Rollback: 1.7.1-ambasa.11 / 1bfbb2e.

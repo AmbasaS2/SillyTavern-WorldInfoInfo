@@ -423,3 +423,16 @@
 .stwii--insight-details>summary{cursor:pointer;font-size:.95em;font-weight:600;padding:2px 0;}
 .stwii--insight-details[open]>summary{margin-bottom:7px;}
 .stwii--insight-measure:disabled{opacity:.55;cursor:default;}
+
+/* Lore Insight: compact summary, theme-colored bars, separate evidence. */
+.stwii--insight-card{gap:5px;}
+.stwii--insight-card strong{font-size:1.5em;line-height:1.25;}
+.stwii--insight-bar{width:100%;height:6px;border-radius:999px;overflow:hidden;background:color-mix(in srgb,var(--SmartThemeBodyColor,currentColor) 13%,transparent);}
+.stwii--insight-bar-fill{height:100%;border-radius:inherit;background:var(--SmartThemeQuoteColor,var(--SmartThemeEmColor,currentColor));}
+.stwii--insight-section>.stwii--insight-bar{margin:1px 0 7px;}
+.stwii--insight-status:empty{display:none;}
+.stwii--insight-status{min-width:0;text-align:center;}
+.stwii--insight-help{font-size:.82em;opacity:.83;min-width:0;}
+.stwii--insight-help>summary{cursor:pointer;padding:2px 0;}
+.stwii--insight-help>p{margin:6px 0 0;font-size:1em;line-height:1.45;}
+.stwii--insight-entry:not(:has(>span)){grid-template-columns:minmax(0,1fr);}

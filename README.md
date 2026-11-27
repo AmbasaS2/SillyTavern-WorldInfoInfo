@@ -29,7 +29,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.11.**
+**Current version: 1.7.1-ambasa.12.**
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
@@ -271,7 +271,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.11.**
+**현재 버전: 1.7.1-ambasa.12.**
 
 > **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
 >
@@ -426,3 +426,8 @@ Right-click / long-press the book button and choose **View Lore Insight / 로어
 **1.7.1-ambasa.11:** Standalone Lore Insight is available for early use. New STLO token reuse and detailed selection-reason integration, additional locale coverage, and full joint runtime regression are still pending. The legacy optional Jev marker remains supported. Rollback: 1.7.1-ambasa.10 (`342e92e`).
 
 **로어 인사이트(1.7.1-ambasa.11):** 책 버튼 우클릭/길게 누르기 후 **로어 인사이트 보기**를 누르세요. RP의 활성 로어와 요청 본문 일치 여부를 확인하고 필요할 때 토큰 추정치를 계산합니다. 신규 STLO 통계 연동과 전체 통합 검증은 추후 진행합니다. 기존 Jev 표시는 유지되며, 위치 복구는 `/wi-position-reset` 명령을 사용하세요.
+
+
+**1.7.1-ambasa.12:** Lore Insight is available once the generation request is assembled, including while the reply streams. Open the dialog to estimate tokens automatically; successful counts are reused. Verified text matches and unverified activated entries have separate sections. See the in-dialog help for scope and uncertainty.
+
+**1.7.1-ambasa.12:** 요청 준비 후 답변 생성 중에도 로어 인사이트를 볼 수 있고, 열었을 때만 토큰을 자동 추정합니다. 주입 확인 로어와 주입 여부 미확인 로어를 분리하고 상세 기준은 창 하단 도움말에 표시합니다.
