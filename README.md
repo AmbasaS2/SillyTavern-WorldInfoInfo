@@ -84,7 +84,7 @@ Select a lore entry to open the floating, read-only reader without leaving the c
 | Sticky continuation | An earlier activation remains active |
 | External activation | Another feature or extension activated the entry |
 | `@@activate` | Activation through the directive |
-| 🔮 Jev | Selected by compatible STLO and verified in the request |
+| 🔮 | Selected by Jev in compatible STLO and verified in the request |
 | Unknown | Insufficient evidence for the cause |
 
 **Configured strategy ≠ actual cause.** A vectorized entry can activate because a keyword matched.
@@ -270,7 +270,7 @@ The detailed sections below explain optional settings. Compatibility is version-
 
 ### 🔮 Jev Recall via STLO
 
-With the compatible [Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. Lore selected by Jev and included in the current RP's injected lore list is marked **🔮 Jev**, separately from ordinary always-active, keyword, vector and manually activated entries.
+With the compatible [Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering), enable Jev for the current character in the separate Lorebook Jev Recall menu (group chats use book-level opt-ins). Exclude individual books in Lorebook Budget Management if needed. The injected lore list shows **🔮** for lore selected by Jev and verified in the current RP request.
 
 This works with any supported lorebook enabled for Jev in STLO: memories, character information, world lore or NPC records. Memory Books is not required. Open an entry to read its contents or an available saved translation. The built-in reader and recorded entries in the recursion report identify Jev as the recall source. The optional lore token total includes these entries as part of the injected list.
 
@@ -353,7 +353,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 | 📌 Sticky 유지 | 이전 발동이 유지되는 상태 |
 | 외부 활성화 | 다른 확장·기능이 활성화 |
 | `@@activate` | 해당 지시에 따른 활성화 |
-| 🔮 Jev | 호환 STLO가 고른 로어 중 주입이 확인된 항목 |
+| 🔮 | 호환 STLO의 Jev가 고른 로어 중 주입이 확인된 항목 |
 | 확인 불가 | 원인을 확인할 기록이 부족함 |
 
 일치한 기본·보조 키워드와 부정 조건 논리도 기록된 경우 표시합니다. 여러 원인이 확인되면 함께 표시할 수 있어요. 목록의 📌 숫자는 Sticky의 남은 유지 횟수입니다.
@@ -480,7 +480,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ### 🔮 Jev 표시 연동
 
-기존 호환 버전에서 제공하던 🔮 Jev 표시를 유지합니다. 최신 월드인포인포(.14)와 STLO(.7)는 실제 요청의 주입 확인 항목과 계측을 연동해요. 목록·열람창·기록된 재귀 보고서와 로어 인사이트에서 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
+로어 목록에서 🔮 아이콘은 Jev가 선택하고 주입이 확인된 로어를 뜻합니다. 최신 월드인포인포(.14)와 STLO(.7)는 실제 요청의 주입 확인 항목과 계측을 연동해요. 열람창·기록된 재귀 보고서와 로어 인사이트에서도 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
 **안내 기준:** 1.7.1-ambasa.14. 실제 요청 삽입 확인·로어 인사이트·STLO 통계 연동의 세부 범위와 검증 이력은 [개발 기록](docs/lore-insight-v1.md)을 참고하세요.
 

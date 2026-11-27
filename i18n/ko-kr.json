@@ -26,7 +26,7 @@
   "worldInfoInfo.panel.waiting": "프롬프트를 확인하는 중입니다…",
   "worldInfoInfo.panel.hidden": "(숨김 처리된 항목)",
   "worldInfoInfo.panel.ungrouped": "로어 항목",
-  "worldInfoInfo.entry.note": "저자의 메모",
+  "worldInfoInfo.entry.note": "작가 노트",
   "worldInfoInfo.entry.sticky": "앞으로 {0}회 더 고정 활성화",
   "worldInfoInfo.entry.message.one": "메시지 #{0}",
   "worldInfoInfo.entry.message.range": "메시지 #{0}~{1}",

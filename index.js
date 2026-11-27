@@ -265,7 +265,7 @@ const strategy = {
     constant: '🔵',
     normal: '🟢',
     vectorized: '🔗',
-    jev: '🔮 Jev',
+    jev: '🔮',
 };
 const getStrategy = (entry)=>{
     if (entry.stwiiJevRecall === true) return 'jev';
@@ -1848,7 +1848,12 @@ const init = ()=>{
                         const strat = document.createElement('div'); {
                             strat.classList.add('stwii--strategy');
                             if (entry.type == 'wi') {
-                                strat.textContent = strategy[getStrategy(entry)];
+                                const entryStrategy = getStrategy(entry);
+                                strat.textContent = strategy[entryStrategy];
+                                if (entryStrategy === 'jev') {
+                                    strat.setAttribute('role', 'img');
+                                    strat.setAttribute('aria-label', wiT('reader.reason.jev'));
+                                }
                             } else if (entry.type == 'mes') {
                                 strat.classList.add('fa-solid', 'fa-fw', 'fa-comments');
                                 strat.setAttribute('data-stwii--count', entry.count.toString());
