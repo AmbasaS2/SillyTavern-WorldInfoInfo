@@ -30,6 +30,7 @@
   "worldInfoInfo.entry.sticky": "앞으로 {0}회 더 고정 활성화",
   "worldInfoInfo.entry.message.one": "메시지 #{0}",
   "worldInfoInfo.entry.message.range": "메시지 #{0}~{1}",
+  "worldInfoInfo.entry.message.count": "{0}개",
   "worldInfoInfo.reader.dialog": "로어 항목",
   "worldInfoInfo.reader.close": "닫기",
   "worldInfoInfo.reader.body": "로어 본문 (읽기 전용)",

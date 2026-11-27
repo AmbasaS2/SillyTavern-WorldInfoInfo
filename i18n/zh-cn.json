@@ -28,6 +28,7 @@
   "worldInfoInfo.entry.sticky": "还将固定激活 {0} 轮",
   "worldInfoInfo.entry.message.one": "消息 #{0}",
   "worldInfoInfo.entry.message.range": "消息 #{0}–{1}",
+  "worldInfoInfo.entry.message.count": "{0}条",
   "worldInfoInfo.reader.dialog": "世界书条目",
   "worldInfoInfo.reader.close": "关闭",
   "worldInfoInfo.reader.body": "世界书正文（只读）",

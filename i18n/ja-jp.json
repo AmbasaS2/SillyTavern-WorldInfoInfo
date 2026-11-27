@@ -28,6 +28,7 @@
   "worldInfoInfo.entry.sticky": "あと{0}回、固定で有効",
   "worldInfoInfo.entry.message.one": "メッセージ #{0}",
   "worldInfoInfo.entry.message.range": "メッセージ #{0}〜{1}",
+  "worldInfoInfo.entry.message.count": "{0}件",
   "worldInfoInfo.reader.dialog": "ロアエントリー",
   "worldInfoInfo.reader.close": "閉じる",
   "worldInfoInfo.reader.body": "ロア本文（読み取り専用）",

@@ -28,6 +28,7 @@
   "worldInfoInfo.entry.sticky": "Activación fija durante {0} rondas más",
   "worldInfoInfo.entry.message.one": "Mensaje #{0}",
   "worldInfoInfo.entry.message.range": "Mensajes #{0}–{1}",
+  "worldInfoInfo.entry.message.count": "{0} msj.",
   "worldInfoInfo.reader.dialog": "Entrada de lore",
   "worldInfoInfo.reader.close": "Cerrar",
   "worldInfoInfo.reader.body": "Texto de lore (solo lectura)",

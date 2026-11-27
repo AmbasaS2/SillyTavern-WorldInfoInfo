@@ -115,19 +115,9 @@
   opacity: 0.5;
 }
 .stwii--messages .stwii--strategy {
-  position: relative;
-}
-.stwii--messages .stwii--strategy::after {
-  content: attr(data-stwii--count);
-  font-family: var(--mainFontFamily);
-  position: absolute;
-  inset: 0;
-  text-shadow: -1px -1px 1px black, 1px 1px 1px black, -1px 1px 1px black, 1px -1px 1px black;
-  font-size: 0.75em;
-  padding-top: 0.25em;
-}
-.stwii--messages .stwii--strategy::before {
-  opacity: 0.5;
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 .stwii--messages .stwii--title {
   flex: 1 1 auto;
