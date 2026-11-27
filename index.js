@@ -1,4 +1,4 @@
-import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
+import { chat, chat_metadata, event_types, eventSource, main_api, extension_prompts, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
 import { translate as stTranslate, getCurrentLocale } from '../../../i18n.js';
 import { metadata_keys } from '../../../authors-note.js';
 import { extension_settings, getContext } from '../../../extensions.js';
@@ -17,7 +17,8 @@ import { tryOpenInLoreLibrary } from './lore-library-link.js';
 import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 import { canReplaceReport, persistReport } from './report-storage.js';
-import { createLoreInsight, createInsightTokenCache, insightReason, canShowInsightWorld } from './lore-insight.mjs';
+import { createLoreInsight, createInsightTokenCache, insightReason, insightReasonCodes, canShowInsightWorld, requestTextParts, getInsightRows, verifiedInsightRows } from './lore-insight.mjs';
+import { observePromptAssembly, collectNonactivated, scanSkipReason } from './prompt-inclusion.mjs';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -442,6 +443,7 @@ function matchLoreReaderChatTypography(dialog, body) {
 
 // Keep verification on the displayed snapshot, not in saved lore data.
 const confirmedOutletEntries = new WeakSet();
+const confirmedRenderedEntries = new WeakMap();
 const displayedActivationEvents = new WeakMap();
 
 // Explain the most recent confirmed activation using the already-captured
@@ -728,32 +730,25 @@ function renderedWiContent(entry, preserveWhitespace = false) {
         return '';
     }
 }
-function confirmedWiEntries(entryList, generationData, insightCapture = null) {
-    const parts = promptTextParts(generationData?.prompt ?? generationData?.input);
-    const finalPrompt = parts.join('\n').replace(/\s+/g, ' ').trim();
-    try{insightCapture?.setPrompt(parts,finalPrompt);}catch{}
+function captureWiCandidates(entryList,generationData,capture){
+    if(!capture)return;
+    const prompt=generationData?.prompt??generationData?.input;
+    capture.setPrompt(Array.isArray(prompt)?requestTextParts(prompt):promptTextParts(prompt),null);
+    for(const entry of entryList){
+        if(capture.truncated)break;
+        capture.add(entry,renderedWiContent(entry,true),entry.position===world_info_position.outlet);
+    }
+}
 
-    return entryList.filter(entry => {
-        confirmedOutletEntries.delete(entry);
-        // SillyTavern has already applied probability, budget, group and activation rules
-        // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
-        // 'No active entries' for ordinary (non-outlet) entries.
-        const exactRendered = renderedWiContent(entry, true);
-        const rendered = exactRendered.trim();
-        try{insightCapture?.add(entry,exactRendered,entry.position === world_info_position.outlet);}catch{}
-        if (!rendered) return false;
-        if (entry.position !== world_info_position.outlet) return true;
-
-        // Outlet entries are activated by the scan even when no outlet is consumed
-        // by the preset. Only include one if its text actually reaches the request.
-        if (!finalPrompt) return false;
-        const candidates = [rendered, String(entry.content ?? '')];
-        const matched = candidates.some(text => {
-            const normalized = text.replace(/\s+/g, ' ').trim();
-            return normalized.length > 0 && finalPrompt.includes(normalized);
-        });
-        if (matched) confirmedOutletEntries.add(entry);
-        return matched;
+// The badge, reader list, slash command, report and Insight all consume the
+// same verified request rows. Activation flags and arbitrary text hits are
+// never admission evidence.
+function applyConfirmedWiEntries(capture){
+    return verifiedInsightRows(capture).map(row=>{
+        const entry=row.entry;
+        confirmedRenderedEntries.set(entry,row.text);
+        if(row.outlet)confirmedOutletEntries.add(entry);
+        return entry;
     });
 }
 
@@ -1218,15 +1213,7 @@ const init = ()=>{
         trigger.classList.remove('stwii--badge-in', 'stwii--badge-out', 'stwii--badge-bounce');
         if (oldCount !== count) {
             if (count === 0) {
-                if (oldCount < 0) {
-                    trigger.setAttribute('data-stwii--badge-count', '0');
-                    return;
-                }
-                trigger.classList.add('stwii--badge-out');
-                await delay(510);
-                if (token !== badgeToken) return;
                 trigger.setAttribute('data-stwii--badge-count', '0');
-                trigger.classList.remove('stwii--badge-out');
             } else {
                 const cls = oldCount === 0 ? 'stwii--badge-in' : 'stwii--badge-bounce';
                 trigger.setAttribute('data-stwii--badge-count', String(count));
@@ -1246,6 +1233,8 @@ const init = ()=>{
     let currentChatNoteDepth;
     let panelNeedsRender = false;
     let pendingEntries = [];
+    let observedLoreLists=null,promptTrace=null;
+    function releasePromptTrace(){promptTrace?.release();promptTrace=null;}
     let generationSerial = 0;
     let realGenerationInProgress = false;
     let stopConsoleCapture = null;
@@ -1258,6 +1247,8 @@ const init = ()=>{
     const onWorldInfoEntriesLoaded = (lists) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         jevRecall.consume(lists);
+        observedLoreLists=lists;
+        promptTrace?.note();
     };
     const resetJevRecall = () => jevRecall.reset();
     eventSource.on(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
@@ -1297,6 +1288,12 @@ const init = ()=>{
         isVisible: world => canShowInsightWorld(world, isAdmin(),
             typeof getCurrentUserHandle === 'function' ? getCurrentUserHandle() : ''),
         reasonLabel: reason => reason === 'multiple' ? wiT('insight.multiple') : wiT('reader.reason.' + reason),
+        reasonIcons: entry => insightReasonCodes(entry,displayedActivationEvents.get(entry)).map(reason=>({
+            key:reason,
+            icon:({constant:strategy.constant,keyword:strategy.normal,vector:strategy.vectorized,
+                jev:strategy.jev.split(' ')[0],sticky:'📌',decorator:'🪄',external:'⚡',unknown:'❔'})[reason],
+            label:wiT('reader.reason.'+reason),
+        })),
         watchRequest: listener => {
             const event=event_types.CHAT_COMPLETION_SETTINGS_READY;
             if(!event)return null;
@@ -1364,7 +1361,7 @@ const init = ()=>{
             let count = null;
             try {
                 const texts = currentEntryList.filter(entry => entry?.type === 'wi')
-                    .map(renderedWiContent).filter(Boolean);
+                    .map(entry=>confirmedRenderedEntries.get(entry)).filter(Boolean);
                 const result = texts.length ? await insightTokens.countText(texts.join('\n')) : 0;
                 if (Number.isFinite(result) && result >= 0) count = Math.round(result);
             } catch {
@@ -1381,8 +1378,7 @@ const init = ()=>{
     // This is the exact number of messages used by the last real WI scan.
     // SillyTavern already logs it; no chat/history scan is needed.
     let stwiiCurrentScanMessageCount = null;
-    // Publish the badge immediately; defer hidden detail DOM construction.
-    // Delay only outlet entries until prompt verification.
+    // Publish only the verified request result; defer hidden detail DOM construction.
     function renderGenerationEntries(list) {
         const signature = generationSerial + ':' + list.map(entry =>
             String(entry.world) + '§§§' + String(entry.uid) + '§§§' + String(entry.sticky || 0) + '§§§' + (entry.stwiiJevRecall === true ? 'jev' : '')).join('|');
@@ -1391,7 +1387,7 @@ const init = ()=>{
         lastRenderedGenerationEntries = signature;
         void updateBadge(list.map(entry => String(entry.world) + '§§§' + String(entry.uid)));
         if (list.length) updatePanel(list, true);
-        else { panelNeedsRender = false; panel.textContent = '?'; tokenFooter = null; }
+        else { panelNeedsRender = false; panel.textContent = wiT('panel.noneVerified'); tokenFooter = null; }
         syncTokenFooter();
     }
 
@@ -1404,6 +1400,9 @@ const init = ()=>{
         insight.start();
         insightTokens.clear();
         generationType = type;
+        releasePromptTrace();
+        observedLoreLists=null;
+        if(main_api==='openai')promptTrace=observePromptAssembly(promptManager,()=>extension_prompts,type);
         jevRecall.reset();
         realGenerationInProgress = true;
         startWorldInfoConsoleCapture();
@@ -1426,8 +1425,11 @@ const init = ()=>{
         stwiiCurrentLoopEntryIds = null;
         stwiiCurrentLoopEventIds = null;
         stwiiActiveLoopIndex = -1;
-        // Keep the previous completed result visible until this real run
-        // resolves. Do not show an empty list mid-generation.
+        scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        // Do not show the previous reply's rows as this reply's insertion.
+        renderGenerationEntries([]);
+        panel.textContent=wiT('panel.waiting');
+        lastRenderedGenerationEntries=null;
     };
 
     eventSource.on(event_types.GENERATION_STARTED, beginRealGeneration);
@@ -1438,6 +1440,7 @@ const init = ()=>{
         jevRecall.reset();
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
+        releasePromptTrace();observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
         tokenGenerationAwaitingEnd = false;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
@@ -1473,6 +1476,7 @@ const init = ()=>{
     const onWorldInfoActivated = (entryList) => {
         if (!realGenerationInProgress || stwiiDryRunActive) return;
         observedActivatedCount = Array.isArray(entryList) ? entryList.length : null;
+        if(!Array.isArray(entryList))return;
 
         // SillyTavern has already checked and stored timed effects during this
         // WI scan. Read its in-memory end count directly rather than invoking a
@@ -1493,91 +1497,79 @@ const init = ()=>{
                 return snapshot;
             });
         pendingEntries = filtered;
-
-        // Keep the instant list update and verify outlets only in the final prompt.
-        const immediatelyVisible = filtered.filter(entry =>
-            entry.position !== world_info_position.outlet && !!renderedWiContent(entry));
-        renderGenerationEntries(immediatelyVisible);
+        // Never publish scan candidates, even for ordinary or constant lore.
     };
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, onWorldInfoActivated);
 
     const onGenerateAfterData = (data, dryRun) => {
-        // Ignore dry runs and repeated/later hooks for an already completed run.
-        if (dryRun || !realGenerationInProgress) return;
-        realGenerationInProgress = false;
+        if(dryRun||!realGenerationInProgress)return;
+        realGenerationInProgress=false;
         releaseWorldInfoConsoleCapture();
-        const candidates = pendingEntries;
-        let insightCapture=null;
-        try{insightCapture=STWII.loreInsight?.beginCapture(generationSerial,getCurrentChatId(),observedActivatedCount);}catch{}
-        const included = confirmedWiEntries(candidates, data, insightCapture);
-        jevRecall.reset();
-        pendingEntries = [];
-        // Repaint only if an outlet is confirmed or sticky metadata changed;
-        // otherwise keep the already-built DOM and instant button response.
-        renderGenerationEntries(included);
-        finalizedTokenGeneration = generationSerial;
-        // The legacy footer still waits for completion. Lore Insight can
-        // calculate during streaming when the user opens it.
+        const candidates=pendingEntries,serial=generationSerial,chatId=getCurrentChatId();
+        const build=lastReportBuild?.chatId===chatId?lastReportBuild:null;
+        const complete=canReplaceReport(build,observedActivatedCount,candidates);
+        const captured=build??stwiiCurrentBuild;
+        let trace=null,insightCapture=null;
+        try{trace=promptTrace?.take()??null;}catch{releasePromptTrace();}
+        promptTrace=null;
+        try{
+            insightCapture=STWII.loreInsight?.beginCapture(serial,chatId,observedActivatedCount);
+            captureWiCandidates(candidates,data,insightCapture);
+            if(insightCapture&&(observedActivatedCount!==null||complete)){
+                const skipped=collectNonactivated(observedLoreLists,candidates,scanSkipReasons);
+                insightCapture.nonactivated=skipped.rows;insightCapture.nonactivatedLimited=skipped.limited;
+            }
+        }catch{}
+        observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        pendingEntries=[];jevRecall.reset();
+        finalizedTokenGeneration=serial;
         syncTokenFooter();
 
-        // Keep the complete current report in RAM. Only a verified scan
-        // can replace saved metadata and retire legacy logs.
-        const ids = new Set(included.map(it => String(it.world) + ':' + String(it.uid)));
-        const build = lastReportBuild?.chatId === getCurrentChatId() ? lastReportBuild : null;
-        const complete = canReplaceReport(build, observedActivatedCount, candidates);
-        const captured = build ?? stwiiCurrentBuild;
-        const jevIds = new Set(included.filter(entry => entry.stwiiJevRecall === true)
-            .map(entry => String(entry.world) + ':' + String(entry.uid)));
-        const added = (captured?.added ?? []).filter(ev => ids.has(String(ev.world) + ':' + String(ev.uid)))
-            .map(ev => jevIds.has(String(ev.world) + ':' + String(ev.uid))
-                ? { ...ev, jevConfirmed: true, logic: 'JEV', reason: 'jev', primary: null, secondary: [], vectorConfirmed: false }
-                : ev);
-        lastLiveReport = {
-            runId: captured?.runId ?? Date.now(),
-            chatId: getCurrentChatId(),
-            added,
-            logs: captured?.logs ?? [],
-            loopCounts: build?.loopCounts ?? [],
-            loopEntryIds: build?.loopEntryIds ?? [],
-            incomplete: !complete,
-        };
-        const eventsById = new Map();
-        for (const ev of added) {
-            const id = String(ev.world) + ':' + String(ev.uid);
-            if (!eventsById.has(id)) eventsById.set(id, ev);
+        // Keep activation reasons available for both the confirmed entries
+        // and the separate diagnostic lists. Do not save raw prompts.
+        const eventsById=new Map();
+        for(const ev of captured?.added??[]){
+            const id=JSON.stringify([ev.world,ev.uid]);
+            if(!eventsById.has(id))eventsById.set(id,ev);
         }
-        for (const entry of included) {
-            displayedActivationEvents.set(entry, eventsById.get(String(entry.world) + ':' + String(entry.uid)) ?? null);
+        for(const entry of candidates){
+            const ev=eventsById.get(JSON.stringify([entry.world,entry.uid]));
+            displayedActivationEvents.set(entry,ev??null);
         }
-        // Explain activated but unverified outlets using captured events without
-        // adding them to the legacy list/report.
-        if (insightCapture) {
-            const includedSet = new Set(included);
-            const unmatchedById = new Map(insightCapture.rows.filter(row => !includedSet.has(row.entry))
-                .map(row => [String(row.entry.world) + ':' + String(row.entry.uid), row.entry]));
-            for (const ev of captured?.added ?? []) {
-                const key = String(ev.world) + ':' + String(ev.uid);
-                const entry = unmatchedById.get(key);
-                if (entry) {
-                    displayedActivationEvents.set(entry, ev);
-                    unmatchedById.delete(key);
-                }
-            }
+        function finalizeVerified(capture){
+            if(serial!==generationSerial||chatId!==getCurrentChatId())return;
+            const included=applyConfirmedWiEntries(capture);
+            renderGenerationEntries(included);
+            const ids=new Set(included.map(it=>String(it.world)+':'+String(it.uid)));
+            const jevIds=new Set(included.filter(entry=>entry.stwiiJevRecall===true)
+                .map(entry=>String(entry.world)+':'+String(entry.uid)));
+            const added=(captured?.added??[]).filter(ev=>ids.has(String(ev.world)+':'+String(ev.uid)))
+                .map(ev=>jevIds.has(String(ev.world)+':'+String(ev.uid))
+                    ?{...ev,jevConfirmed:true,logic:'JEV',reason:'jev',primary:null,secondary:[],vectorConfirmed:false}:ev);
+            const rows=getInsightRows(capture);
+            const reportComplete=complete&&capture?.source==='request'&&!capture.truncated&&!capture.promptLimited&&
+                rows.length===candidates.length&&rows.every(row=>row.sourceVerified||row.status==='excluded');
+            const originalLoops=build?.loopEntryIds;
+            const loopEntryIds=Array.isArray(originalLoops)&&originalLoops.every(Array.isArray)
+                ?originalLoops.map(group=>group.filter(id=>ids.has(id))):[];
+            lastLiveReport={
+                runId:captured?.runId??Date.now(),chatId,added,logs:captured?.logs??[],
+                loopCounts:loopEntryIds.map(group=>group.length),loopEntryIds,incomplete:!reportComplete,
+            };
+            try{persistReport(chat_metadata,lastLiveReport,reportComplete);}
+            catch(error){console.warn('🦥 WorldInfo Info','[WorldInfo Info] Report storage failed; previous metadata retained',error);}
         }
-        try {
-            persistReport(chat_metadata, lastLiveReport, complete);
-        } catch (error) {
-            console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Report storage failed; previous metadata retained', error);
-        }
-        try {
-            STWII.loreInsight?.finish(insightCapture, complete, main_api === 'openai'
-                ? {messages:data?.prompt,type:generationType,structure:promptManager.messages,
+        try{
+            if(insightCapture)STWII.loreInsight?.finish(insightCapture,complete,main_api==='openai'
+                ?{messages:data?.prompt,type:generationType,structure:promptManager.messages,trace,
                     squashed:getContext()?.chatCompletionSettings?.squash_system_messages===true,
                     beforePosition:world_info_position.before,afterPosition:world_info_position.after,
-                    formatWorldInfo:insightOpenAI.formatWorldInfo} : null);
-        } catch {}
-        lastReportBuild = null;
-        stwiiCurrentBuild = null;
+                    depthPosition:world_info_position.atDepth,anTopPosition:world_info_position.ANTop,
+                    anBottomPosition:world_info_position.ANBottom,
+                    formatWorldInfo:insightOpenAI.formatWorldInfo}:null,finalizeVerified);
+            else finalizeVerified(null);
+        }catch{finalizeVerified(null);}
+        lastReportBuild=null;stwiiCurrentBuild=null;
     };
     eventSource.on(event_types.GENERATE_AFTER_DATA, onGenerateAfterData);
 
@@ -1599,6 +1591,8 @@ const init = ()=>{
         insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
+        releasePromptTrace();observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
+        renderGenerationEntries([]);
         if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         realGenerationInProgress = false;
         pendingEntries = [];
@@ -1918,6 +1912,7 @@ function startBuildSession(startedFromScan = false) {
             pendingEntries = [];
             stwiiCurrentLoopEventIds = [];
             stwiiActiveLoopIndex = -1;
+            scanSkipReasons.clear();scanReasonKeyByUid.clear();
         }
         stwiiCurrentBuild = { runId: STWII.currentRunId, startedFromScan, finished: false, finalCount: null, added: [], logs: [] };
     }
@@ -1943,6 +1938,7 @@ function endBuildSession() {
     const vectorActivatedIds = new Set();
     // Track last seen world for a given numeric UID (engine logs sometimes omit the world on follow-up lines)
     const lastWorldByUid = new Map();
+    const scanSkipReasons=new Map(),scanReasonKeyByUid=new Map();
 
     // Build composite key helper "World:UID" or placeholder "?:UID" when world is unknown
     function makeDraftKey(uid, world) {
@@ -1975,6 +1971,23 @@ function endBuildSession() {
     function handleWiDebugArgs(args) {
         if (!args || args.length === 0) return;
         const a0 = args[0];
+
+        // Read only actual engine skip messages; keep bounded metadata, not
+        // another scan or a guessed reason from saved activation flags.
+        const header=typeof args[1]==='string'&&args[1].includes(' processing')?args[2]:null;
+        if(header&&typeof header.world==='string'&&header.uid!=null){
+            const uid=Number(header.uid);
+            lastWorldByUid.set(uid,header.world);
+            if(scanReasonKeyByUid.size<512||scanReasonKeyByUid.has(uid))
+                scanReasonKeyByUid.set(uid,JSON.stringify([header.world,header.uid]));
+        }
+        const skip=scanSkipReason(typeof args[1]==='string'?args[1]:String(a0??''));
+        if(skip){
+            const obj=typeof args[1]==='object'?args[1]:null;
+            const id=obj&&typeof obj.world==='string'&&obj.uid!=null?JSON.stringify([obj.world,obj.uid]):
+                scanReasonKeyByUid.get(parseWiUIDFromFirstArg(a0));
+            if(id&&(scanSkipReasons.size<512||scanSkipReasons.has(id)))scanSkipReasons.set(id,skip);
+        }
 
         // The vector extension reports its own matches before issuing the
         // generic force-activation event. An entry's vectorized flag alone
@@ -2232,7 +2245,7 @@ function endBuildSession() {
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
             firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
-            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
+            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ') || /^WI entry \d+ failed probability check, removing from activated entries$/.test(firstArg)
         )) return original_debug.apply(console, args);
         if (firstArg.includes('[WI] --- START WI SCAN')) stwiiDryRunActive = firstArg.includes('(DRY RUN)');
         if (stwiiDryRunActive) return original_debug.apply(console, args);
@@ -2300,7 +2313,7 @@ function endBuildSession() {
         const firstArg = args[0];
         if (typeof firstArg !== 'string' || !(
             firstArg.includes('[WI]') || firstArg.includes('--- BUILDING PROMPT ---')
-            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ')
+            || firstArg.includes('--- DONE ---') || firstArg.startsWith('Vectors: Activated ') || /^WI entry \d+ failed probability check, removing from activated entries$/.test(firstArg)
         )) return original_log.apply(console, args);
         if (firstArg.includes('[WI] --- START WI SCAN')) stwiiDryRunActive = firstArg.includes('(DRY RUN)');
         if (stwiiDryRunActive) return original_log.apply(console, args);
@@ -2439,6 +2452,7 @@ window.STWII.destroy = function() {
     linkedLoreClickSerial++;
     closeLoreViewer();
     releaseWorldInfoConsoleCapture();
+    releasePromptTrace();observedLoreLists=null;scanSkipReasons.clear();scanReasonKeyByUid.clear();
     try {
         const t = window.STWII.trigger;
         if (t && t.parentNode) t.parentNode.removeChild(t);
