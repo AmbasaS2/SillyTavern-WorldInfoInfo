@@ -1,5 +1,5 @@
 import { chat, chat_metadata, event_types, eventSource, main_api, saveSettingsDebounced, getCurrentChatId } from '../../../../script.js';
-import { translate as stTranslate } from '../../../i18n.js';
+import { translate as stTranslate, getCurrentLocale } from '../../../i18n.js';
 import { metadata_keys } from '../../../authors-note.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 import { promptManager } from '../../../openai.js';
@@ -100,6 +100,11 @@ function wiT(key, ...values) {
         values[Number(index)] === undefined ? match : String(values[Number(index)]));
 }
 
+function slothToastTitle() {
+    const locale = String(getCurrentLocale() || '').toLowerCase();
+    return '🦥 ' + (/^ko(?:[-_]|$)/.test(locale) ? '월드인포인포' : 'WorldInfo Info');
+}
+
 const STWII = (window.STWII ||= {});
 let navigatingEntry = false;
 
@@ -151,7 +156,7 @@ async function openActiveEntry(world, uid) {
         }
         throw new Error('Entry is unavailable in the editor');
     } catch (error) {
-        toastr.warning(error.message);
+        toastr.warning(error.message, slothToastTitle());
     } finally {
         navigatingEntry = false;
     }
@@ -670,7 +675,7 @@ function renderedWiContent(entry) {
         });
         return typeof text === 'string' ? text.trim() : '';
     } catch (error) {
-        console.warn('[WorldInfo Info] Unable to verify entry content', error);
+        console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Unable to verify entry content', error);
         return '';
     }
 }
@@ -1450,7 +1455,7 @@ const init = ()=>{
         try {
             persistReport(chat_metadata, lastLiveReport, complete);
         } catch (error) {
-            console.warn('[WorldInfo Info] Report storage failed; previous metadata retained', error);
+            console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Report storage failed; previous metadata retained', error);
         }
         lastReportBuild = null;
         stwiiCurrentBuild = null;
