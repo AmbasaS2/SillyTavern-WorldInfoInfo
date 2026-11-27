@@ -715,10 +715,10 @@ const init = ()=>{
         // extension-controlled drag mode or introducing an observer.
         trigger.addEventListener('dragstart', event => event.preventDefault());
         trigger.addEventListener('click', ()=>{
-            // Entries are already rendered when the real generation is processed.
-            // Opening the book should be an immediate visibility toggle, not a
-            // second pass through chat history and every World Info entry.
             const opened = panel.classList.toggle('stwii--isActive');
+            // The latest scan is already captured; build the detail DOM only
+            // when it is visible, before the first paint of the open panel.
+            if (opened && panelNeedsRender) updatePanel(currentEntryList);
             requestAnimationFrame(ensurePanelsVisible);
             if (opened) scheduleTokenSummary();
         });
@@ -1183,6 +1183,9 @@ const init = ()=>{
     };
     let currentEntryList = [];
     let currentChat = [];
+    let currentChatNote = '';
+    let currentChatNoteDepth;
+    let panelNeedsRender = false;
     let pendingEntries = [];
     let generationSerial = 0;
     let realGenerationInProgress = false;
@@ -1282,8 +1285,8 @@ const init = ()=>{
     // This is the exact number of messages used by the last real WI scan.
     // SillyTavern already logs it; no chat/history scan is needed.
     let stwiiCurrentScanMessageCount = null;
-    // Build the list as soon as ordinary lore activates, just like the
-    // original extension. Delay only outlet entries until prompt verification.
+    // Publish the badge immediately; defer hidden detail DOM construction.
+    // Delay only outlet entries until prompt verification.
     function renderGenerationEntries(list) {
         const signature = generationSerial + ':' + list.map(entry =>
             String(entry.world) + '§§§' + String(entry.uid) + '§§§' + String(entry.sticky || 0) + '§§§' + (entry.stwiiJevRecall === true ? 'jev' : '')).join('|');
@@ -1292,7 +1295,7 @@ const init = ()=>{
         lastRenderedGenerationEntries = signature;
         void updateBadge(list.map(entry => String(entry.world) + '§§§' + String(entry.uid)));
         if (list.length) updatePanel(list, true);
-        else { panel.textContent = '?'; tokenFooter = null; }
+        else { panelNeedsRender = false; panel.textContent = '?'; tokenFooter = null; }
         syncTokenFooter();
     }
 
@@ -1343,6 +1346,10 @@ const init = ()=>{
         pendingEntries = [];
         stwiiCurrentScanMessageCount = null;
         currentEntryList = [];
+        currentChat = [];
+        currentChatNote = '';
+        currentChatNoteDepth = undefined;
+        panelNeedsRender = false;
         lastRenderedGenerationEntries = null;
         lastReportBuild = null;
         lastLiveReport = null;
@@ -1474,7 +1481,22 @@ const init = ()=>{
     };
     eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);
 
-    const updatePanel = (entryList, newChat = false)=>{
+    function updatePanel(entryList, newChat = false) {
+        if (newChat) {
+            // Capture the scan-time text/depth, not a later streamed reply or
+            // edited message when the user eventually opens the book.
+            currentChat = chat.map(message => ({ mes: message.mes }));
+            if (generationType === 'swipe') currentChat.pop();
+            currentChatNote = chat_metadata[metadata_keys.prompt];
+            currentChatNoteDepth = chat_metadata[metadata_keys.depth];
+        }
+        panelNeedsRender = true;
+        if (!panel.classList.contains('stwii--isActive')) return;
+        renderPanelContents(entryList);
+        panelNeedsRender = false;
+    }
+
+    const renderPanelContents = (entryList)=>{
         const isGrouped = extension_settings.worldInfoInfo?.group ?? true;
         const isOrdered = extension_settings.worldInfoInfo?.order ?? true;
         const isMes = extension_settings.worldInfoInfo?.mes ?? true;
@@ -1523,7 +1545,7 @@ const init = ()=>{
         const depthPos = [world_info_position.ANBottom, world_info_position.ANTop, world_info_position.atDepth];
         for (const [world, entries] of Object.entries(grouped)) {
             for (const e of entries) {
-                e.depth = e.position == world_info_position.atDepth ? e.depth : (chat_metadata[metadata_keys.depth] + (e.position == world_info_position.ANTop ? 0.1 : 0));
+                e.depth = e.position == world_info_position.atDepth ? e.depth : (currentChatNoteDepth + (e.position == world_info_position.ANTop ? 0.1 : 0));
             }
             const w = document.createElement('div'); {
                 w.classList.add('stwii--world');
@@ -1572,8 +1594,8 @@ const init = ()=>{
                     }
                 });
                 if (!isGrouped && isOrdered && isMes) {
-                    const an = chat_metadata[metadata_keys.prompt];
-                    const ad = chat_metadata[metadata_keys.depth];
+                    const an = currentChatNote;
+                    const ad = currentChatNoteDepth;
                     if (an?.length) {
                         const idx = entries.findIndex(e=>depthPos.includes(e.position) && e.depth <= ad);
                         entries.splice(idx, 0, {
@@ -1582,10 +1604,6 @@ const init = ()=>{
                             depth: ad,
                             text: an,
                         });
-                    }
-                    if (newChat) {
-                        currentChat = [...chat];
-                        if (generationType == 'swipe') currentChat.pop();
                     }
                     const segmenter = new Intl.Segmenter('en', { granularity:'sentence' });
                     let currentDepth = currentChat.length - 1;
