@@ -69,3 +69,45 @@ test('nonactivated entries carry only bounded metadata and actual logged reasons
  assert.equal(scanSkipReason('suppressed by cooldown'),'cooldown');assert.equal(scanSkipReason('activated because of constant'),null);
  assert.equal(collectNonactivated({globalLore:[a,b]},[],null,1).limited,true);
 });
+
+test('unrelated opaque macro or conditional group cannot erase exact depth proof',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,4,'depth memory',{depth:1,role:0})];
+ const nodes=[node('chatHistory-3','depth memory','chatHistory'),node('chatHistory-4','old chat','chatHistory','user'),node('chatHistory-1','expanded value','chatHistory','assistant'),node('chatHistory-2','older','chatHistory','user')];
+ const ordered=[nodes[2],nodes[3],nodes[0],nodes[1]];
+ const {capture,info,trace}=fixture(rows,ordered,ordered.map(n=>req(n.content,n.role)),{trace:{
+  extensions:new Map([['customDepthWI_1_0',{value:'depth memory',position:1,depth:1,role:0}],['other',{value:'{{getvar::example}}',position:1,depth:3,role:2,dynamic:true}]]),
+  history:new Map([['chatHistory-4',{raw:'old chat',content:'old chat',role:'user'}],['chatHistory-3',{raw:'depth memory',content:'depth memory',role:'system'}],['chatHistory-2',{raw:'older',content:'older',role:'user'}],['chatHistory-1',{raw:'expanded value',content:'expanded value',role:'assistant'}]])
+ }});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+ trace.history.get('chatHistory-3').raw='different';
+ assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,0);
+});
+test('uncertain earlier slot and identical chat text do not become proof',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,4,'depth memory',{depth:1,role:0})];
+ const nodes=[node('chatHistory-1','older','chatHistory','user'),node('chatHistory-2','depth memory','chatHistory'),node('chatHistory-3','depth memory','chatHistory'),node('chatHistory-4','maybe macro','chatHistory')];
+ const {capture,info,trace}=fixture(rows,nodes,nodes.map(n=>req(n.content,n.role)),{trace:{
+  extensions:new Map([['unknown',{value:'{{getvar::example}}',position:1,depth:0,role:0}],['customDepthWI_1_0',{value:'depth memory',position:1,depth:1,role:0}]]),
+  history:new Map(nodes.map(n=>[n.id,{raw:n.content,content:n.content,role:n.role}]))
+ }});
+ assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,0);
+});
+test('absolute main and relative prompt moved into its native bucket preserve separate depth lore',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,4,'memory',{depth:1,role:0})];
+ const nodes=[node('chatHistory-1','older','chatHistory','user'),node('chatHistory-2','memory','chatHistory'),node('chatHistory-3','recent','chatHistory','user'),node('chatHistory-4','main\nnote','chatHistory')];
+ const {capture,info,trace}=fixture(rows,nodes,nodes.map(n=>req(n.content,n.role)),{trace:{
+  prompts:[{id:'main',position:1,depth:0,role:'system',order:100,content:'main'},{id:'authorsNote',position:0,relativePosition:'end',role:'system',content:'note'}],
+  extensions:new Map([['customDepthWI_1_0',{value:'memory',position:1,depth:1,role:0}]]),
+  history:new Map(nodes.map(n=>[n.id,{raw:n.content,content:n.content,role:n.role}]))
+ }});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
+test('whole-prompt diagnostic limit does not erase actual dedicated source proof',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const nodes=[node('worldInfoAfter','Real'),node('chatHistory-1','x'.repeat(530000),'chatHistory','user')];
+ const {capture,info,trace}=fixture([row(1,1,'Real')],nodes,nodes.map(n=>req(n.content,n.role)));
+ capture.promptLimited=true;
+ assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,1);
+});
