@@ -1281,6 +1281,7 @@ const init = ()=>{
     function releasePromptTrace(){promptTrace?.release();promptTrace=null;}
     let generationSerial = 0;
     let realGenerationInProgress = false;
+    let backgroundOverlap = false;
     let stopConsoleCapture = null;
     const jevRecall = createJevRecallReceipts();
     const recordStloJevRecall = (lists, appliedKeys) => {
@@ -1444,7 +1445,16 @@ const init = ()=>{
         // Token-count passes and background/quiet generations aren't the
         // on-screen reply. Neither should replace the most recent displayed
         // reply's World Info. A quietToLoud generation *is* user-visible.
-        if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
+        if (dryRun) return;
+        if (type === 'quiet' && !options?.quietToLoud) {
+            // Native GENERATE_AFTER_DATA / STOPPED / ENDED do not carry a
+            // generation identity. If a quiet request starts during capture,
+            // do not attribute its prompt or activation events to the RP.
+            if (realGenerationInProgress) onGenerationStopped();
+            else if (tokenGenerationAwaitingEnd) backgroundOverlap = true;
+            return;
+        }
+        backgroundOverlap = false;
         generationSerial++;
         insight.start();
         insightTokens.clear();
@@ -1482,6 +1492,7 @@ const init = ()=>{
 
     eventSource.on(event_types.GENERATION_STARTED, beginRealGeneration);
     const onChatChanged = () => {
+        backgroundOverlap = false;
         insight.clear();
         insightTokens.clear();
         generationSerial++;
@@ -1633,8 +1644,21 @@ const init = ()=>{
         syncTokenFooter();
         if (panel.classList.contains('stwii--isActive')) scheduleTokenSummary();
     };
-    eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);
-    eventSource.on(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
+    // Only a real assistant message can complete an overlapping RP after
+    // a quiet generation started. Never guess which request emitted END.
+    const onUnscopedCompletion = () => {
+        if (!backgroundOverlap) onCompletedGeneration();
+    };
+    const onVisibleMessageReceived = (messageId, type) => {
+        if (backgroundOverlap) {
+            const id = Number(messageId);
+            const message = Number.isSafeInteger(id) && id === chat.length - 1 ? chat[id] : null;
+            if (!message || message.is_user || message.is_system || type === 'first_message') return;
+        }
+        onCompletedGeneration();
+    };
+    eventSource.on(event_types.GENERATION_ENDED, onUnscopedCompletion);
+    eventSource.on(event_types.MESSAGE_RECEIVED, onVisibleMessageReceived);
     const onGenerationStopped = () => {
         // Quiet/other extension work may emit a stop with no visible generation.
         // Preserve the last confirmed reply and its diagnostics in that case.
@@ -1654,7 +1678,10 @@ const init = ()=>{
         tokenSummary = null;
         syncTokenFooter();
     };
-    eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);
+    const onUnscopedStopped = () => {
+        if (!backgroundOverlap) onGenerationStopped();
+    };
+    eventSource.on(event_types.GENERATION_STOPPED, onUnscopedStopped);
 
     function updatePanel(entryList, newChat = false) {
         if (newChat) {
@@ -2477,9 +2504,9 @@ window.STWII.destroy = function() {
     badgeToken++;
     // New completion hooks have explicit teardown; no lingering token work.
     try {
-        eventSource.removeListener?.(event_types.GENERATION_ENDED, onCompletedGeneration);
-        eventSource.removeListener?.(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
-        eventSource.removeListener?.(event_types.GENERATION_STOPPED, onGenerationStopped);
+        eventSource.removeListener?.(event_types.GENERATION_ENDED, onUnscopedCompletion);
+        eventSource.removeListener?.(event_types.MESSAGE_RECEIVED, onVisibleMessageReceived);
+        eventSource.removeListener?.(event_types.GENERATION_STOPPED, onUnscopedStopped);
         eventSource.removeListener?.(event_types.GENERATION_STARTED, beginRealGeneration);
         eventSource.removeListener?.(event_types.WORLDINFO_ENTRIES_LOADED, onWorldInfoEntriesLoaded);
         eventSource.removeListener?.(event_types.CHAT_CHANGED, onChatChanged);
