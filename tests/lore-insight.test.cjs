@@ -16,7 +16,7 @@ test('missing prompt, duplicates and oversized prompt never create false matches
  const cap=createInsightCapture(1,'chat',null);
  cap.setPrompt(['x'.repeat(530000)],'x');
  cap.add(entry(1),'x');cap.add(entry(1),'x');cap.add(entry(1,'Other'),'x');
- assert.equal(cap.prompt,null);
+ assert.equal(cap.parts,null);
  assert.deepEqual(inspectInsight(cap).map(r=>r.status),['unknown','unknown']);
 });
 test('recorded activation reasons are not configured flags or double counted',async()=>{
@@ -79,4 +79,54 @@ test('actual menu button, preserved reset command and lifecycle cleanup',()=>{
  assert.match(source,/name: 'wi-position-reset'/);
  assert.equal(ko['worldInfoInfo.settings.insight.label'],'로어 인사이트 보기');
  assert.match(source,/insight\.clear\(\);\s*insightTokens\.clear\(\)/);
+});
+
+test('request correlation excludes quiet, cloned and reordered requests',async()=>{
+ const {createRequestMatcher,requestTextParts}=await mod();
+ const a={role:'system',content:'A'},b={role:'user',content:'B'},c={role:'assistant',content:'C'};
+ const match=createRequestMatcher([a,b,c],'normal');
+ assert.equal(match({type:'quiet',messages:[a,b,c]}),false);
+ assert.equal(match({type:'normal',messages:[{...a},{...b},{...c}]}),false);
+ assert.equal(match({type:'normal',messages:[c,b,a]}),false);
+ assert.equal(match({type:'normal',messages:[a,{...b,content:'Changed'},c]}),true);
+ assert.equal(match({type:'normal',messages:[a]}),false);
+ assert.deepEqual(requestTextParts([a,{content:[{type:'text',text:'D'},{type:'image_url',image_url:{url:'ignore'}}]}]),['A','D']);
+});
+test('message boundaries, duplicate IDs and changed request contents',async()=>{
+ const {createInsightCapture,inspectInsight}=await mod();
+ const cap=createInsightCapture(1,'chat',4);
+ cap.setPrompt(['One','Two and Three'],null);
+ cap.add(entry(1),'One Two');cap.add(entry(2),'One');
+ cap.add(entry(3),'Three');cap.add(entry(3),'Different text');
+ assert.deepEqual(inspectInsight(cap).map(r=>r.status),['unmatched','matched','ambiguous']);
+ cap.setPrompt(['Other'],null,'request');
+ assert.equal(cap.source,'request');
+ assert.equal(inspectInsight(cap)[1].status,'unmatched');
+});
+test('oversized request invalidates assembled text evidence rather than falling back silently',async()=>{
+ const {createInsightCapture,inspectInsight,requestTextParts}=await mod();
+ const cap=createInsightCapture(1,'chat',1);
+ cap.add(entry(1),'Earlier');cap.setPrompt(['Earlier'],null);
+ cap.setPrompt(requestTextParts([{content:'x'.repeat(524289)}]),null,'request');
+ assert.equal(cap.promptLimited,true);assert.equal(cap.source,'request');
+ assert.equal(inspectInsight(cap)[0].status,'unknown');
+});
+test('in-flight count is discarded on scope change or clear',async()=>{
+ const {createInsightTokenCache}=await mod();
+ let resolve,scope='a';
+ const cache=createInsightTokenCache(()=>new Promise(r=>{resolve=r}),()=>scope);
+ let pending=cache.countText('entry');cache.clear();resolve(3);assert.equal(await pending,null);
+ pending=cache.countText('entry');scope='b';resolve(3);assert.equal(await pending,null);
+});
+test('retry only missing counts and preserve successful estimates',async()=>{
+ const {createInsightCapture,inspectInsight,estimateInsight}=await mod();
+ const cap=createInsightCapture(1,'chat',2);
+ cap.setPrompt(['A text and B text'],null);
+ cap.add(entry(1),'A text');cap.add(entry(2),'B text');
+ const rows=inspectInsight(cap);let calls=[];
+ const first=await estimateInsight(rows,cap,async s=>{calls.push(s);return s==='B text\n'?null:s.length},()=>true,true);
+ assert.equal(first.failed,true);assert.equal(rows[0].tokens,7);
+ calls=[];
+ const second=await estimateInsight(rows,cap,async s=>{calls.push(s);return s.length},()=>true,true,first);
+ assert.equal(second.failed,false);assert.deepEqual(calls,['B text\n']);
 });

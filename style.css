@@ -417,3 +417,9 @@
 .stwii--insight-entry span {grid-column:2;grid-row:1 / span 2;align-self:center;}
 .stwii--insight-measure {min-height:36px;width:100%;box-sizing:border-box;flex-shrink:0;}
 @media(max-width:600px){.stwii--insight-dialog{padding:12px;max-height:86dvh}.stwii--insight-line{gap:5px}}
+
+/* Request evidence and collapsible entry details, scoped to Lore Insight. */
+.stwii--insight-source{align-self:flex-start;padding:4px 8px;border:1px solid var(--SmartThemeBorderColor,currentColor);border-radius:6px;font-size:.83em;font-weight:600;}
+.stwii--insight-details>summary{cursor:pointer;font-size:.95em;font-weight:600;padding:2px 0;}
+.stwii--insight-details[open]>summary{margin-bottom:7px;}
+.stwii--insight-measure:disabled{opacity:.55;cursor:default;}

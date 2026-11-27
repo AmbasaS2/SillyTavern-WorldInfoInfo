@@ -98,12 +98,12 @@ const WI_UI_EN = {
     "insight.title": "Lore Insight",
     "insight.waiting": "Available after the current reply finishes.",
     "insight.empty": "No captured RP data in this chat. Generate a reply first.",
-    "insight.note": "Assembled prompt text evidence, not provider usage or proof of entry provenance. Repeated or overlapping text is ambiguous. Token estimates are on demand; grouped values sum individual estimates.",
+    "insight.note": "Text matches are evidence, not proof of lore provenance or provider usage. Repeated or overlapping text is ambiguous. Grouped tokens sum individual estimates.",
     "insight.activated": "Activated (visible)",
     "insight.matched": "Text matched",
     "insight.unresolved": "Not verified",
     "insight.total": "Matched text · combined estimate",
-    "insight.share": "Matched text / assembled prompt text",
+    "insight.share": "Matched lore / captured prompt text",
     "insight.unmeasured": "Not measured",
     "insight.unmatched": "Text not found",
     "insight.unknown": "Unverified",
@@ -116,7 +116,11 @@ const WI_UI_EN = {
     "insight.entries": "Lore entries",
     "insight.visible": "Hidden lore excluded. Full-prompt ratio is not calculated.",
     "insight.limit": "Capture or detail limit reached. Values may be partial; unmeasured values are not zero.",
-    "insight.multiple": "Multiple recorded reasons"
+    "insight.multiple": "Multiple recorded reasons",
+    "insight.source.assembled": "Evidence: assembled prompt",
+    "insight.source.request": "Evidence: pre-send request messages",
+    "insight.scopeChanged": "Tokenizer or generation context changed. Generate a new reply to measure.",
+    "insight.retry": "Retry missing estimates"
 };
 function wiT(key, ...values) {
     const source = WI_UI_EN[key] ?? key;
@@ -707,7 +711,7 @@ function renderedWiContent(entry) {
 function confirmedWiEntries(entryList, generationData, insightCapture = null) {
     const parts = promptTextParts(generationData?.prompt ?? generationData?.input);
     const finalPrompt = parts.join('\n').replace(/\s+/g, ' ').trim();
-    insightCapture?.setPrompt(parts, finalPrompt);
+    try{insightCapture?.setPrompt(parts,finalPrompt);}catch{}
 
     return entryList.filter(entry => {
         confirmedOutletEntries.delete(entry);
@@ -715,7 +719,7 @@ function confirmedWiEntries(entryList, generationData, insightCapture = null) {
         // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
         // 'No active entries' for ordinary (non-outlet) entries.
         const rendered = renderedWiContent(entry);
-        insightCapture?.add(entry, rendered);
+        try{insightCapture?.add(entry,rendered);}catch{}
         if (!rendered) return false;
         if (entry.position !== world_info_position.outlet) return true;
 
@@ -1247,18 +1251,23 @@ const init = ()=>{
     let tokenSummaryPending = -1;
     let tokenSummaryRequest = 0;
     let tokenFooter = null;
-    // Do not share measurements unless the live tokenizer identity is known.
+    // Capture the generation's tokenizer context. Share exact-input promises
+    // only for the known OpenAI-compatible tokenizer path.
     function loreTokenScope() {
         try {
-            const ctx = getContext();
-            if (ctx?.mainApi !== 'openai' || !ctx.powerUserSettings) return null;
-            const model = ctx.getTokenizerModel?.();
-            if (!model) return null;
-            return JSON.stringify([generationSerial, getCurrentChatId(), ctx.mainApi,
-                ctx.chatCompletionSettings?.chat_completion_source, model, ctx.powerUserSettings.tokenizer]);
-        } catch { return null; }
+            const ctx=getContext();
+            if(!ctx?.mainApi||!ctx.powerUserSettings)return null;
+            const api=ctx.mainApi,model=api==='openai'?ctx.getTokenizerModel?.():ctx.onlineStatus;
+            if(api==='openai'&&!model)return null;
+            return JSON.stringify([generationSerial,getCurrentChatId(),api,
+                ctx.chatCompletionSettings?.chat_completion_source,ctx.textCompletionSettings?.type,
+                model,ctx.powerUserSettings.tokenizer]);
+        }catch{return null;}
     }
-    const insightTokens = createInsightTokenCache(getTokenCountAsync, loreTokenScope);
+    function sharedLoreTokenScope(){
+        try{return getContext()?.mainApi==='openai'?loreTokenScope():null;}catch{return null;}
+    }
+    const insightTokens=createInsightTokenCache(getTokenCountAsync,sharedLoreTokenScope);
     const insight = createLoreInsight({
         t: wiT, countText: insightTokens.countText, getScope: loreTokenScope,
         getChatId: getCurrentChatId,
@@ -1267,6 +1276,13 @@ const init = ()=>{
         isVisible: world => canShowInsightWorld(world, isAdmin(),
             typeof getCurrentUserHandle === 'function' ? getCurrentUserHandle() : ''),
         reasonLabel: reason => reason === 'multiple' ? wiT('insight.multiple') : wiT('reader.reason.' + reason),
+        watchRequest: listener => {
+            const event=event_types.CHAT_COMPLETION_SETTINGS_READY;
+            if(!event)return null;
+            if(typeof eventSource.makeLast==='function')eventSource.makeLast(event,listener);
+            else eventSource.on(event,listener);
+            return ()=>eventSource.removeListener?.(event,listener);
+        },
     });
     STWII.loreInsight = insight;
     const tokenBridge = Object.freeze({ apiVersion: 1, count: insightTokens.countText });
@@ -1470,7 +1486,8 @@ const init = ()=>{
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
         const candidates = pendingEntries;
-        const insightCapture = STWII.loreInsight?.beginCapture(generationSerial, getCurrentChatId(), observedActivatedCount);
+        let insightCapture=null;
+        try{insightCapture=STWII.loreInsight?.beginCapture(generationSerial,getCurrentChatId(),observedActivatedCount);}catch{}
         const included = confirmedWiEntries(candidates, data, insightCapture);
         jevRecall.reset();
         pendingEntries = [];
@@ -1516,7 +1533,10 @@ const init = ()=>{
         } catch (error) {
             console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Report storage failed; previous metadata retained', error);
         }
-        STWII.loreInsight?.finish(insightCapture, complete);
+        try {
+            STWII.loreInsight?.finish(insightCapture, complete, main_api === 'openai'
+                ? {messages:data?.prompt,type:generationType} : null);
+        } catch {}
         lastReportBuild = null;
         stwiiCurrentBuild = null;
     };
@@ -1526,7 +1546,8 @@ const init = ()=>{
     // single event callback only schedules work when the opt-in list is open.
     const onCompletedGeneration = () => {
         releaseWorldInfoConsoleCapture();
-        if (!tokenGenerationAwaitingEnd) return;
+        if (!tokenGenerationAwaitingEnd || realGenerationInProgress ||
+            finalizedTokenGeneration !== generationSerial) return;
         tokenGenerationAwaitingEnd = false;
         insight.ready();
         syncTokenFooter();
@@ -1539,12 +1560,14 @@ const init = ()=>{
         insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
-        if (!realGenerationInProgress) return;
+        if (!realGenerationInProgress && !tokenGenerationAwaitingEnd) return;
         realGenerationInProgress = false;
         pendingEntries = [];
         tokenGenerationAwaitingEnd = false;
+        finalizedTokenGeneration = -1;
         tokenSummaryRequest++;
         tokenSummaryPending = -1;
+        tokenSummary = null;
         syncTokenFooter();
     };
     eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);
