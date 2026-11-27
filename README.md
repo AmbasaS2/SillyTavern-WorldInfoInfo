@@ -29,7 +29,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.9.**
+**Current version: 1.7.1-ambasa.11.**
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
@@ -126,7 +126,7 @@ Right-click the floating book on desktop or long-press it on mobile. Both the en
 | View original text | Off | Show original list titles and reader titles/bodies; skip translation lookup |
 | Link Lorebook Library | Off | Open the exact entry in the compatible library instead of the built-in reader |
 | Allow dragging the book button | Off | Move the floating book |
-| Reset book button position | Action | Restore the original position |
+| View Lore Insight | Action | Open the separate read-only RP lore analysis |
 
 > [!TIP]
 > To inspect the position of lore relative to chat messages, turn grouping off and keep injection ordering and message positions on.
@@ -271,7 +271,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.9.**
+**현재 버전: 1.7.1-ambasa.11.**
 
 > **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
 >
@@ -363,7 +363,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 | 원문으로 보기 (View original text) | 꺼짐 | 목록 제목과 기본 열람창 제목·본문 원문 표시, 번역 조회 생략 |
 | 로어북 서가 연동 | 꺼짐 | 호환 로어북 매니저 서재에서 정확한 항목 열기 |
 | 책 버튼 드래그 허용 | 꺼짐 | 원하는 위치로 이동 |
-| 책 버튼 위치 초기화 | 실행 버튼 | 원래 위치로 복귀 |
+| 로어 인사이트 보기 | 실행 버튼 | 최근 RP 로어 분석 창 열기 |
 
 > [!TIP]
 > 책별 묶기만 끄고 주입 순서와 대화 메시지 위치 표시를 켜면 책 구분 없이 주입 배치를 확인할 수 있어요.
@@ -417,3 +417,12 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 - **This fork:** reading-oriented additions and optional integrations.
 
 This project retains the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE).
+
+
+### Lore Insight
+Right-click / long-press the book button and choose **View Lore Insight / 로어 인사이트 보기**. The separate read-only dialog distinguishes captured activation from text matches in the assembled prompt or correlated pre-send request; estimates are on demand, not API usage. The recovery command `/wi-position-reset` remains. See [measurement limits and integration](docs/lore-insight-v1.md).
+
+
+**1.7.1-ambasa.11:** Standalone Lore Insight is available for early use. New STLO token reuse and detailed selection-reason integration, additional locale coverage, and full joint runtime regression are still pending. The legacy optional Jev marker remains supported. Rollback: 1.7.1-ambasa.10 (`342e92e`).
+
+**로어 인사이트(1.7.1-ambasa.11):** 책 버튼 우클릭/길게 누르기 후 **로어 인사이트 보기**를 누르세요. RP의 활성 로어와 요청 본문 일치 여부를 확인하고 필요할 때 토큰 추정치를 계산합니다. 신규 STLO 통계 연동과 전체 통합 검증은 추후 진행합니다. 기존 Jev 표시는 유지되며, 위치 복구는 `/wi-position-reset` 명령을 사용하세요.
