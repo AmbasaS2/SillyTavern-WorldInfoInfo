@@ -2489,6 +2489,16 @@ window.STWII.destroy = function() {
     closeLoreViewer();
     releaseWorldInfoConsoleCapture();
     releasePromptTrace();noteBeforeScan=null;
+    // Release global gesture handlers before removing their trigger.
+    window.removeEventListener('pointermove', onLongPressPointerMove);
+    window.removeEventListener('pointerup', clearLongPress);
+    window.removeEventListener('pointercancel', clearLongPress);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', endDrag);
+    window.removeEventListener('pointercancel', endDrag);
+    clearLongPress();
+    dragging = false;
+    movedEnough = false;
     try {
         const t = window.STWII.trigger;
         if (t && t.parentNode) t.parentNode.removeChild(t);
