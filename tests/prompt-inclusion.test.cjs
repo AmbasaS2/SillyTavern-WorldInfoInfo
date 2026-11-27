@@ -55,7 +55,6 @@ test('observing native assembly preserves returns and restores inherited methods
  const prompts=manager.getPromptCollection('normal');
  const root={getCollection:()=>[{identifier:'main',getCollection:()=>[{identifier:'main',role:'system',content:prompts.collection[0].content}]}]};
  assert.equal(manager.setChatCompletion({getMessages:()=>root}),42);
- assert.equal(manager.preparePrompt,original.preparePrompt);
  const trace=observer.take();
  assert.equal(manager.preparePrompt,original.preparePrompt);assert.equal(Object.hasOwn(manager,'preparePrompt'),false);
  const {capture,info}=fixture([row(1,7,'value',{outletName:'memory'})],[],[req('value')]);
@@ -110,4 +109,41 @@ test('whole-prompt diagnostic limit does not erase actual dedicated source proof
  const {capture,info,trace}=fixture([row(1,1,'Real')],nodes,nodes.map(n=>req(n.content,n.role)));
  capture.promptLimited=true;
  assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,1);
+});
+
+test('concurrent native assemblies reuse history IDs without stealing the live request trace',async()=>{
+ const {observePromptAssembly,buildTraceEvidence}=await mod();
+ class NativeMessage{
+  static fromPromptAsync(p){return Promise.resolve({identifier:p.identifier,role:p.role,content:p.content});}
+ }
+ const originalFrom=NativeMessage.fromPromptAsync;
+ const manager={
+  serviceSettings:{squash_system_messages:true},
+  getPromptCollection(){return {collection:[this.preparePrompt({identifier:'main',role:'system',content:'main'})]};},
+  preparePrompt(p){return {...p};},
+  setChatCompletion(c){this.messages=c.getMessages();}
+ };
+ const original=manager.preparePrompt,ext={customDepthWI_0_0:{value:'live memory',position:1,depth:0,role:0}};
+ const obs=observePromptAssembly(manager,()=>ext,'normal',null,NativeMessage);
+ const live=manager.getPromptCollection('normal'),dry=manager.getPromptCollection('normal');
+ const dryPrompt=manager.preparePrompt({identifier:'chatHistory-2',role:'user',content:'dry old text'});
+ const livePrompt=manager.preparePrompt({identifier:'chatHistory-2',role:'system',content:'live memory'});
+ const [dryMain,liveMain,dryMessage,liveMessage,liveOld]=await Promise.all([
+  NativeMessage.fromPromptAsync(dry.collection[0]),NativeMessage.fromPromptAsync(live.collection[0]),
+  NativeMessage.fromPromptAsync(dryPrompt),NativeMessage.fromPromptAsync(livePrompt),
+  NativeMessage.fromPromptAsync(manager.preparePrompt({identifier:'chatHistory-1',role:'user',content:'old'}))
+ ]);
+ const make=(main,history)=>({getMessages:()=>({getCollection:()=>[
+  {identifier:'main',getCollection:()=>[main]},{identifier:'chatHistory',getCollection:()=>history}
+ ]}),getChat:()=>[req(main.content),...history.map(n=>req(n.content,n.role))]});
+ const dryCompletion=make(dryMain,[dryMessage]),liveCompletion=make(liveMain,[liveOld,liveMessage]);
+ manager.setChatCompletion(dryCompletion);const dryArray=dryCompletion.getChat();
+ manager.setChatCompletion(liveCompletion);const liveArray=liveCompletion.getChat();
+ assert.equal(dryArray[1].content,'dry old text');
+ const trace=obs.take(liveArray);
+ assert.equal(trace.history.get('chatHistory-2').raw,'live memory');
+ assert.equal(trace.collectionKnown,true);
+ assert.equal(manager.preparePrompt,original);assert.equal(NativeMessage.fromPromptAsync,originalFrom);
+ const {capture,info}=fixture([row(1,4,'live memory',{depth:0,role:0})],[],liveArray,{info:{squashed:true}});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
 });
