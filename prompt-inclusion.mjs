@@ -1,7 +1,7 @@
 // Read-only observation of the actual ST 1.19.1 prompt assembly.
 // Preserve native return values, errors and object contents. Never run a macro
 // or tokenizer again to guess provenance; detach all observers at assembly end.
-const LIMIT=4096, CHARS=524288;
+const LIMIT=4096, CHARS=524288, TRACE_CHARS=4*1024*1024, MAX_LAYOUTS=64;
 const key=e=>JSON.stringify([e.world,e.uid]);
 const roles=['system','user','assistant'];
 const squashExcluded=new Set(['newMainChat','newChat','groupNudge']);
@@ -19,7 +19,7 @@ function flatMessages(root){
             if(!message||typeof message.getCollection==='function'||out.length>=LIMIT)return null;
             if(message.content!=null&&!isText(message.content))return null;
             const content=message.content;
-            if((chars+=(content?.length??0))>CHARS)return null;
+            if((chars+=(content?.length??0))>TRACE_CHARS)return null;
             out.push({parent:nested?item.identifier:null,id:message.identifier,role:message.role,
                 name:message.name||'',content,tools:!!message.tool_calls});
         }
@@ -71,7 +71,7 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null)
             if(!result||!isText(raw?.content)||!isText(result.content))return;
             const record={raw:raw.content,content:result.content,role:result.role,id:result.identifier};
             if(historyIndex(result.identifier)){
-                if(history.size>=LIMIT||(chars+=raw.content.length+result.content.length)>CHARS){limited=true;return;}
+                if(history.size>=LIMIT||(chars+=raw.content.length+(raw.content===result.content?0:result.content.length))>TRACE_CHARS){limited=true;return;}
                 if(history.has(result.identifier)){limited=true;return;}
                 history.set(result.identifier,record);
             }else if(/\{\{\s*outlet::/i.test(raw.content)){
@@ -89,7 +89,8 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null)
                 if(p.content!=null&&!isText(p.content)){latest=null;return;}
                 if((size+=(p.content?.length??0))>CHARS){latest=null;return;}
                 prompts.push({id:p.identifier,role:p.role,content:p.content??'',depth:p.injection_depth,
-                    position:p.injection_position,order:p.injection_order??100,raw:prepared.get(p)?.raw});
+                    position:p.injection_position,order:p.injection_order??100,relativePosition:p.position,
+                    extension:p.extension===true,raw:prepared.get(p)?.raw});
             }
             latest={nodes,extensions,prompts,history:new Map(history),noteBase,
                 disabledBefore:manager.isPromptDisabledForActiveCharacter?.('worldInfoBefore')===true,
@@ -113,7 +114,7 @@ function align(trace,messages,squashed){
         const merge=squashed&&node.role==='system'&&!node.name&&!squashExcluded.has(node.id)&&isText(node.content);
         if(merge&&last?.merge){last.content+='\n'+node.content;last.nodes.push(node);}
         else{last={content:node.content,role:node.role,name:node.name,merge,nodes:[node],entries:[]};blocks.push(last);}
-        if((size+=(node.content?.length??0)+1)>CHARS)return null;
+        if((size+=(node.content?.length??0)+1)>TRACE_CHARS)return null;
     }
     if(blocks.length!==messages.length)return null;
     const byNode=new Map();
@@ -170,12 +171,26 @@ function preparedOutlets(prompt,trace,outlets){
     const expanded=expandLiteralOutlets(prompt.raw,trace,outlets);
     return expanded&&expanded.text===prompt.content?expanded.rows:[];
 }
-function nativeDepthGroups(capture,trace,info,outlets,noteRows){
-    // Absolute main moves relative extension prompts into its own bucket.
-    // The public API does not expose that final intermediate list; fail closed.
-    if(trace.prompts.some(p=>p.id==='main'&&p.position===1))return null;
+// Reproduce the host's absolute-main handling using the already prepared
+// prompt collection. Never re-evaluate a filter or a macro.
+function absolutePrompts(trace){
+    const absolute=trace.prompts.filter(p=>p.position===1);
+    if(!absolute.some(p=>p.id==='main'))return absolute;
+    function insert(p){
+        if(!p?.relativePosition)return;
+        const i=absolute.findIndex(x=>x.id==='main');
+        const main=absolute[i];
+        absolute.splice(i+(p.relativePosition==='end'?1:0),0,
+            {...p,role:main.role,position:main.position,depth:main.depth,order:main.order});
+    }
+    for(const id of ['summary','authorsNote','vectorsMemory','vectorsDataBank','smartContext'])
+        insert(trace.prompts.find(p=>p.id===id));
+    for(const p of trace.prompts.filter(p=>p.extension&&p.relativePosition))insert(p);
+    return absolute;
+}
+function nativeDepthChoices(capture,trace,info,outlets,noteRows){
     if(trace.type==='continue'&&!trace.continuePrefill)return null;
-    const byDepth=new Map(),absolute=trace.prompts.filter(p=>p.position===1&&p.content);
+    const byDepth=new Map(),absolute=absolutePrompts(trace).filter(p=>p.content);
     function depth(d){if(!byDepth.has(d))byDepth.set(d,{absolute:[],extensions:[]});return byDepth.get(d);}
     for(const p of absolute){
         if(!positive(p.depth)||p.depth>10000||!roles.includes(p.role)||!Number.isFinite(p.order))return null;
@@ -183,10 +198,10 @@ function nativeDepthGroups(capture,trace,info,outlets,noteRows){
     }
     for(const [id,p] of trace.extensions){
         if(p.position!==1||!p.value)continue;
-        if(p.dynamic||!positive(p.depth)||p.depth>10000||!positive(p.role)||p.role>2)return null;
+        if(!positive(p.depth)||p.depth>10000||!positive(p.role)||p.role>2)return null;
         depth(p.depth).extensions.push({id,...p});
     }
-    const groups=[];
+    const choices=[];
     for(const [d,data] of [...byDepth].sort((a,b)=>a[0]-b[0])){
         const orders=new Set([100,...data.absolute.map(p=>p.order)]);
         for(const order of [...orders].sort((a,b)=>b-a)){
@@ -194,58 +209,117 @@ function nativeDepthGroups(capture,trace,info,outlets,noteRows){
                 const rolePrompts=data.absolute.filter(p=>p.order===order&&p.role===role);
                 const roleText=rolePrompts.map(p=>p.content).join('\n');
                 const sources=rolePrompts.flatMap(p=>preparedOutlets(p,trace,outlets));
-                const ext=order===100?data.extensions.filter(p=>roles[p.role]===role):[];
-                const expanded=expandLiteralOutlets(ext.map(p=>p.value.trim()).join('\n'),trace,outlets);
-                if(!expanded)return null;
-                sources.push(...expanded.rows);
-                for(const p of ext){
-                    if(p.id==='2_floating_prompt'&&noteRows.length&&!p.value.includes('{{'))sources.push(...noteRows);
-                    if(p.id!==('customDepthWI_'+d+'_'+p.role))continue;
-                    const rows=capture.rows.filter(row=>!row.outlet&&row.entry.position===info.depthPosition&&
-                        (row.entry.depth??4)===d&&(row.entry.role??0)===p.role);
-                    if(validGroup(rows)&&orderRows(rows).reverse().map(row=>row.text).join('\n')===p.value&&!p.value.includes('{{'))sources.push(...rows);
+                for(const p of rolePrompts){
+                    const position=p.id==='worldInfoBefore'?info.beforePosition:p.id==='worldInfoAfter'?info.afterPosition:null;
+                    if(Number.isInteger(position)){
+                        const rows=capture.rows.filter(r=>!r.outlet&&r.entry.position===position&&r.text);
+                        if(validGroup(rows)){
+                            const joined=orderRows(rows).reverse().map(r=>r.text).join('\n');
+                            const expected=info.formatWorldInfo(joined);
+                            if(isText(expected)&&expected.includes(joined)&&p.content===expected)sources.push(...rows);
+                        }
+                    }
+                    if(p.id==='authorsNote'&&noteRows.length&&p.content===trace.extensions.get('2_floating_prompt')?.value)sources.push(...noteRows);
                 }
-                const content=[roleText,expanded.text].filter(Boolean).map(s=>s.trim()).join('\n');
-                if(content)groups.push({depth:d,role,content,rows:sources});
-                if(groups.length>LIMIT)return null;
+                const ext=order===100?data.extensions.filter(p=>roles[p.role]===role):[];
+                if(!roleText&&!ext.length)continue;
+                // A conditional extension may be present or absent. Let the
+                // actual native history choose; do not call its filter again.
+                let variants=[[]];
+                for(const p of ext){
+                    variants=p.dynamic?variants.flatMap(items=>[items,[...items,p]]):variants.map(items=>[...items,p]);
+                    if(variants.length>MAX_LAYOUTS)return null;
+                }
+                const options=[];
+                for(const included of variants){
+                    const expanded=expandLiteralOutlets(included.map(p=>p.value.trim()).join('\n'),trace,outlets);
+                    if(!expanded){
+                        // This group's macro output is opaque. It may shift
+                        // other slots, but must not erase their exact proof.
+                        options.push({depth:d,role,content:null,rows:[]});
+                        if(!roleText.trim())options.push(null);
+                        continue;
+                    }
+                    const rows=[...sources,...expanded.rows];
+                    for(const p of included){
+                        if(p.id==='2_floating_prompt'&&noteRows.length&&!p.value.includes('{{'))rows.push(...noteRows);
+                        if(p.id!==('customDepthWI_'+d+'_'+p.role))continue;
+                        const depthRows=capture.rows.filter(row=>!row.outlet&&row.entry.position===info.depthPosition&&
+                            (row.entry.depth??4)===d&&(row.entry.role??0)===p.role);
+                        if(validGroup(depthRows)&&orderRows(depthRows).reverse().map(row=>row.text).join('\n')===p.value&&!p.value.includes('{{'))rows.push(...depthRows);
+                    }
+                    const content=[roleText,expanded.text].filter(Boolean).map(s=>s.trim()).join('\n');
+                    options.push(content?{depth:d,role,content,rows}:null);
+                }
+                const distinct=new Map();
+                for(const option of options){
+                    const signature=option?JSON.stringify([option.content,option.rows.map(r=>key(r.entry))]):'absent';
+                    if(!distinct.has(signature))distinct.set(signature,option);
+                }
+                choices.push([...distinct.values()]);
+                if(choices.length>LIMIT)return null;
             }
         }
     }
-    return groups;
+    return choices;
 }
 function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
-    const groups=nativeDepthGroups(capture,trace,info,outlets,noteRows);
-    if(!groups||!groups.length||!trace.history.size)return;
+    const choices=nativeDepthChoices(capture,trace,info,outlets,noteRows);
+    if(!choices?.length||!trace.history.size)return;
     const indices=[...trace.history.keys()].map(id=>Number(historyIndex(id)));
     const total=Math.max(...indices),lowest=Math.min(...indices);
-    if(!positive(total)||total>LIMIT||total<groups.length||lowest<1||indices.length!==total-lowest+1)return;
-    const slots=Array(total-groups.length).fill(null);
-    let inserted=0;
-    for(let i=0;i<groups.length;){
-        const d=groups[i].depth;let j=i+1;while(j<groups.length&&groups[j].depth===d)j++;
-        slots.splice(d+inserted,0,...groups.slice(i,j));inserted+=j-i;i=j;
-    }
-    // Check every observed injected slot against the host's actual input and
-    // prepared output, before accepting any of the route reconstruction.
-    let observed=0;const verified=[],historyNodes=new Map();
+    if(!positive(total)||total>LIMIT||lowest<1||indices.length!==total-lowest+1)return;
+    const historyNodes=new Map();
     for(const node of trace.nodes){if(node.parent!=='chatHistory')continue;const list=historyNodes.get(node.id)??[];list.push(node);historyNodes.set(node.id,list);}
-    for(let i=0;i<slots.length;i++){
-        const group=slots[i];if(!group)continue;
-        const id='chatHistory-'+(total-i),record=trace.history.get(id);
-        if(!record){if(total-i>=lowest)return;verified.push({group,node:null});continue;}
-        if(record.raw!==group.content||record.role!==group.role||record.content!==group.content)return;
-        observed++;
-        const candidates=historyNodes.get(id)??[];
-        if(candidates.length>1)return;
-        const node=candidates[0]??null;
-        if(node&&(node.content!==record.content||node.role!==record.role))return;
-        verified.push({group,node});
+    let layouts=[[]];
+    for(const options of choices){
+        if(layouts.length*options.length>MAX_LAYOUTS)return;
+        layouts=layouts.flatMap(layout=>options.map(option=>option?[...layout,option]:layout));
     }
-    // Without any actual slot observation, do not infer what was dropped.
-    if(!observed)return;
-    for(const {group,node} of verified){
-        if(node)addRows(aligned.byNode.get(node),group.rows,node.content);
-        else for(const row of group.rows)if(!row.outlet)excluded.set(key(row.entry),'context');
+    // An entry is confirmed only when *every* possible layout consistent
+    // with the actual history proves that same native slot. Opaque groups
+    // cannot themselves supply proof, nor turn a text-only hit into proof.
+    let common=null;
+    for(const groups of layouts){
+        if(total<groups.length)continue;
+        const slots=Array(total-groups.length).fill(null);
+        let inserted=0;
+        for(let i=0;i<groups.length;){
+            const d=groups[i].depth;let j=i+1;while(j<groups.length&&groups[j].depth===d)j++;
+            slots.splice(d+inserted,0,...groups.slice(i,j));inserted+=j-i;i=j;
+        }
+        let observed=0,valid=true;const verified=[];
+        for(let i=0;i<slots.length;i++){
+            const group=slots[i];if(!group)continue;
+            const id='chatHistory-'+(total-i),record=trace.history.get(id);
+            if(!record){if(total-i>=lowest){valid=false;break;}verified.push({group,node:null});continue;}
+            if(record.role!==group.role||group.content!==null&&(record.raw!==group.content||record.content!==group.content)){valid=false;break;}
+            observed++;
+            const candidates=historyNodes.get(id)??[];
+            if(candidates.length>1){valid=false;break;}
+            const node=candidates[0]??null;
+            if(node&&(node.content!==record.content||node.role!==record.role)){valid=false;break;}
+            verified.push({group,node});
+        }
+        if(!valid)continue;
+        const evidence=new Map();
+        if(observed)for(const {group,node} of verified){
+            for(const row of group.rows){
+                if(!node&&row.outlet)continue;
+                const id=key(row.entry),prior=evidence.get(id);
+                // Multiple actual placements are not a unique depth proof.
+                if(prior&&prior.node!==node){evidence.set(id,{ambiguous:true});continue;}
+                if(!prior?.ambiguous)evidence.set(id,{row,node});
+            }
+        }
+        for(const [id,proof] of evidence)if(proof.ambiguous)evidence.delete(id);
+        if(common===null)common=evidence;
+        else for(const [id,proof] of common)if(!evidence.has(id)||evidence.get(id).node!==proof.node)common.delete(id);
+        if(common.size===0)return;
+    }
+    for(const [id,{row,node}] of common??[]){
+        if(node)addRows(aligned.byNode.get(node),[row],node.content);
+        else excluded.set(id,'context');
     }
 }
 
@@ -253,7 +327,7 @@ function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
 // pre-send request hook must still verify their unchanged role/name/content.
 export function buildTraceEvidence(capture,info,trace){
     const excluded=new Map(),blocks=[];
-    if(!trace||capture.truncated||capture.promptLimited||capture.observed!==capture.rows.length)return {blocks,excluded};
+    if(!trace||capture.truncated||capture.observed!==capture.rows.length)return {blocks,excluded};
     try{
         const aligned=align(trace,info.messages,info.squashed===true);
         if(!aligned)return {blocks,excluded};
