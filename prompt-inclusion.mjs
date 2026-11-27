@@ -12,7 +12,12 @@ function flatMessages(root,readReceipt=null){
     const items=root?.getCollection?.();
     if(!Array.isArray(items)||items.length>LIMIT)return null;
     const out=[];let chars=0;
-    for(const item of items){
+    for(let index=0;index<items.length;index++){
+        // Native ChatCompletion.add writes at preset indices, leaving sparse slots.
+        // getChat skips these; squashSystemMessages flattens with reduce, also skipping holes.
+        if(!(index in items))continue;
+        const item=items[index];
+        if(item==null)continue;
         const nested=typeof item?.getCollection==='function'?item.getCollection():null;
         if(nested!==null&&(!Array.isArray(nested)||nested.length>LIMIT))return null;
         for(const message of nested??[item]){
