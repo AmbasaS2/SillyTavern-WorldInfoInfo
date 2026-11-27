@@ -69,3 +69,38 @@ test('closed settings changes defer repaint; the open trigger flushes before pos
     assert.equal(h.renders.length, 2);
     assert.match(source, /if \(opened && panelNeedsRender\) updatePanel\(currentEntryList\);\s*requestAnimationFrame\(ensurePanelsVisible\)/);
 });
+
+test('unrelated idle generation stop preserves the last verified display and diagnostic state', () => {
+    const calls = [];
+    const context = vm.createContext({
+        realGenerationInProgress: false, tokenGenerationAwaitingEnd: false,
+        tokenSummaryRequest: 4, tokenSummaryPending: -1, tokenSummary: { count: 42 },
+        finalizedTokenGeneration: 5, pendingEntries: [], noteBeforeScan: 'note',
+        insight: { clear() { calls.push('insight'); } },
+        insightTokens: { clear() { calls.push('tokens'); } },
+        resetJevRecall() { calls.push('jev'); },
+        releaseWorldInfoConsoleCapture() { calls.push('console'); },
+        releasePromptTrace() { calls.push('trace'); },
+        renderGenerationEntries(list) { calls.push('render'); assert.equal(list.length, 0); },
+        syncTokenFooter() { calls.push('footer'); },
+    });
+    vm.runInContext(extract('    const onGenerationStopped = () => {',
+        '    eventSource.on(event_types.GENERATION_STOPPED, onGenerationStopped);') +
+        '\nthis.stop = onGenerationStopped;', context);
+    context.stop();
+    assert.equal(calls.length, 0);
+    assert.equal(context.tokenSummary.count, 42);
+    assert.equal(context.finalizedTokenGeneration, 5);
+    assert.equal(context.noteBeforeScan, 'note');
+    context.tokenGenerationAwaitingEnd = true;
+    context.stop();
+    assert.deepEqual(calls, ['insight', 'tokens', 'jev', 'console', 'trace', 'render', 'footer']);
+    assert.equal(context.tokenSummary, null);
+    assert.equal(context.tokenGenerationAwaitingEnd, false);
+    context.stop();
+    assert.equal(calls.length, 7);
+    context.realGenerationInProgress = true;
+    context.stop();
+    assert.equal(context.realGenerationInProgress, false);
+    assert.equal(calls.length, 14);
+});
