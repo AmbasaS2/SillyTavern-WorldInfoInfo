@@ -237,7 +237,7 @@ function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
     if(!observed)return;
     for(const {group,node} of verified){
         if(node)addRows(aligned.byNode.get(node),group.rows);
-        else for(const row of group.rows)excluded.set(key(row.entry),'context');
+        else for(const row of group.rows)if(!row.outlet)excluded.set(key(row.entry),'context');
     }
 }
 

@@ -323,7 +323,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         header.append(title,x);
         const body=element('div','stwii--insight-body');
         dialog.append(header,body);overlay.append(dialog);
-        current={overlay,previousFocus,body,revision:0,timer:null};
+        current={overlay,previousFocus,body,revision:0,timer:null,openTerms:new Map()};
         x.addEventListener('click',close);
         overlay.addEventListener('cancel',e=>{e.preventDefault();close();});
         overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
@@ -339,9 +339,11 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             body.append(element('p','stwii--insight-note',t(waiting?'insight.waiting':'insight.empty')));return;
         }
         const capture=latest,scope=readScope();
-        const allRows=inspectInsight(capture),rows=allRows.filter(r=>isVisible(r.entry.world));
+        const allRows=getInsightRows(capture),rows=allRows.filter(r=>isVisible(r.entry.world));
         const allVisible=rows.length===allRows.length,sameScope=scope!==null&&capture.scope===scope;
-        const matched=rows.filter(r=>r.status==='matched'),unresolved=rows.filter(r=>r.status!=='matched');
+        const matched=verifiedInsightRows(capture).filter(r=>isVisible(r.entry.world));
+        const matchedSet=new Set(matched),excluded=rows.filter(r=>r.status==='excluded'&&!matchedSet.has(r)),unresolved=rows.filter(r=>!matchedSet.has(r)&&r.status!=='excluded');
+        const nonactivated=capture.nonactivated.filter(r=>isVisible(r.entry.world));
         const visibility=JSON.stringify(rows.map(r=>[r.entry.world,r.entry.uid]));
         const saved=sameScope&&capture.measurement?.scope===scope&&capture.measurement?.visibility===visibility?capture.measurement:null;
         for(const row of rows){
@@ -389,20 +391,54 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             if(!groups.size)section.append(element('p','stwii--insight-note',t('insight.noMatches')));
             return section;
         }
-        function entrySection(label,key,list,verified,opened){
+        function termControl(copy,id){
+            const help=element('p','stwii--insight-term-help');
+            help.hidden=true;
+            const buttons=[];
+            const selected=view.openTerms.get(id);
+            function refreshTerms(key){
+                if(key)view.openTerms.set(id,key);else view.openTerms.delete(id);
+                help.hidden=!key;
+                help.textContent=key?t('insight.explain.'+key):'';
+                for(const item of buttons)item.button.setAttribute('aria-expanded',String(item.key===key));
+            }
+            function button(key,label,cls='',ariaLabel=label){
+                const node=element('button','stwii--insight-term'+(cls?' '+cls:''),label);
+                node.type='button';node.setAttribute('aria-label',ariaLabel);
+                node.setAttribute('aria-expanded',String(selected===key));
+                buttons.push({button:node,key});
+                node.addEventListener('click',()=>refreshTerms(view.openTerms.get(id)===key?null:key));
+                return node;
+            }
+            function finish(){copy.append(help);if(selected&&buttons.some(x=>x.key===selected))refreshTerms(selected);}
+            return {button,finish};
+        }
+        function entrySection(label,key,list,verified,opened,inactive=false){
             const detail=element('details','stwii--insight-section stwii--insight-details');
             detail.dataset.insightSection=key;detail.open=opened.has(key);
-            detail.append(element('summary','',t(label)+' · '+list.length));
+            detail.append(element('summary','',t(label)+' · '+list.length+(inactive&&capture.nonactivatedLimited?'+':'')));
             for(const row of list){
                 const line=element('div','stwii--insight-entry');
+                const copy=element('div','stwii--insight-entry-copy');
+                const term=termControl(copy,key+':'+metricsKey(row.entry));
                 let name=String(row.entry.uid??'');try{name=titleFor(row.entry)||name;}catch{}
-                const meta=[String(row.entry.world??''),reasonLabel(row.reason)];
-                const selection=selectionFor(row.entry);
-                if(selection)meta.push(selection);
-                if(row.outlet)meta.push(t('reader.route.outlet')+(row.entry.outletName?' · '+String(row.entry.outletName):''));
-                meta.push(t(verified?(row.sourceVerified?'insight.evidence.verified':'insight.evidence.textOnly'):'insight.'+row.status));
-                line.append(element('strong','',name),element('small','',meta.join(' · ')));
-                if(verified)line.append(element('span','',formatted(row.tokens)));
+                const heading=element('strong','stwii--insight-entry-heading');
+                const icons=inactive?[]:reasonIcons(row.entry);
+                for(const {icon,label,key:reason} of icons)
+                    heading.append(term.button('reason.'+reason,icon,'stwii--insight-reason-icon',label));
+                heading.append(element('span','stwii--insight-entry-name',name));
+                copy.append(heading,element('small','stwii--insight-entry-meta',String(row.entry.world??'')));
+                const terms=element('div','stwii--insight-terms');
+                if(!inactive&&!icons.length)terms.append(term.button('reason.'+row.reason,reasonLabel(row.reason)));
+                if(!inactive){
+                    for(const item of selectionLabels(row.entry))terms.append(term.button(item.key.slice('insight.'.length),item.label));
+                    if(row.outlet)terms.append(term.button('outlet',t('reader.route.outlet')+(row.entry.outletName?' · '+String(row.entry.outletName):'')));
+                }
+                const evidence=inactive?'skip.'+row.reason:verified?'evidence.verified':
+                    row.status==='excluded'?'excluded.'+row.exclusion:row.status==='matched'?'evidence.textOnly':row.status;
+                terms.append(term.button(evidence,t('insight.'+evidence)));
+                copy.append(terms);term.finish();line.append(copy);
+                if(verified)line.append(element('span','stwii--insight-entry-tokens',formatted(row.tokens)));
                 detail.append(line);
             }
             return detail;
@@ -414,10 +450,8 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             const grid=element('div','stwii--insight-grid');
             grid.append(card(t('insight.matched'),t('insight.count',matched.length)),card(t('insight.total'),formatted(measurement?.total)));
             report.append(grid);
-            if(matched.length){
-                const proven=matched.filter(row=>row.sourceVerified).length;
-                report.append(element('p','stwii--insight-note',t('insight.evidence.summary',proven,matched.length-proven)));
-            }
+            if(excluded.length||unresolved.length)
+                report.append(element('p','stwii--insight-note',t('insight.evidence.summary',excluded.length,unresolved.length)));
             const ratio=measurement?.prompt>0&&validCount(measurement.total)&&measurement.total<=measurement.prompt?measurement.total/measurement.prompt:null;
             const ratioCard=card(t('insight.share'),ratio===null?t('insight.unmeasured'):'~'+(100*ratio).toFixed(1)+'%');
             if(ratio!==null)ratioCard.append(bar(ratio));
@@ -426,7 +460,10 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             if(capture.truncated||capture.promptLimited||measurement?.limited)report.append(element('p','stwii--insight-note',t('insight.limit')));
             report.append(groupSection(t('insight.books'),r=>String(r.entry.world??''),s=>s),groupSection(t('insight.reasons'),r=>r.reason,reasonLabel));
             report.append(entrySection('insight.entries','matched',matched,true,opened));
+            if(excluded.length)report.append(entrySection('insight.excluded','excluded',excluded,false,opened));
             if(unresolved.length)report.append(entrySection('insight.unresolved','unresolved',unresolved,false,opened));
+            if(nonactivated.length)report.append(entrySection('insight.nonactivated','nonactivated',nonactivated,false,opened,true));
+            if(capture.nonactivatedLimited)report.append(element('p','stwii--insight-note',t('insight.nonactivatedLimit')));
         }
         const sameView=()=>current===view&&view.revision===revision&&latest===capture&&getChatId()===capture.chatId;
         const stillCurrent=()=>sameView()&&readScope()===scope;
@@ -443,7 +480,7 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
             busy=true;updateStatus();
             try{
                 const countEntry=capture.stlo?(entry,text,valid)=>capture.stlo.count(entry,text,countText,valid):null;
-                const result=await estimateInsight(rows,capture,countText,stillCurrent,allVisible,measurement,countEntry);
+                const result=await estimateInsight(matched,capture,countText,stillCurrent,allVisible,measurement,countEntry);
                 if(result&&stillCurrent()){
                     measurement=result;
                     capture.measurement={scope,visibility,result,tokens:new Map(rows.map(r=>[JSON.stringify([r.entry.world,r.entry.uid]),r.tokens]))};

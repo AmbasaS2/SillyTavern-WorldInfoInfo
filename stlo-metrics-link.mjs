@@ -138,7 +138,8 @@ export function buildInjectionRecords(capture,isVisible,scanComplete){
         const text=capture.proven?.get(key);
         // Unknown is not exclusion. A missing substring is not proof of
         // non-injection after macros, regex, squashing, or backend transforms.
-        records.push(typeof text==='string'&&text.trim()?{key,status:'confirmed',text}:{key,status:'unknown'});
+        records.push(typeof text==='string'&&text.trim()?{key,status:'confirmed',text}:
+            capture.excluded?.has(key)?{key,status:'excluded'}:{key,status:'unknown'});
     }
     return {records,complete};
 }
