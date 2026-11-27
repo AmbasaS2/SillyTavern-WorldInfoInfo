@@ -144,22 +144,27 @@ export function verifiedInsightRows(capture){
     if(capture?.source!=='request'||capture.promptLimited)return [];
     if(capture.inspection)return capture.inspection.filter(row=>row.sourceVerified);
     const result=[],seen=new Set();
+    // Check only structurally proven rows, never run diagnostic searches here.
+    // One normalization of the final request, bounded by the existing capture.
+    const parts=(capture.parts??[]).map(normalize).filter(Boolean);
     for(const row of capture.rows){
         const id=metricsKey(row.entry);
         if(seen.has(id))continue;
         seen.add(id);
-        if(row.text.trim()&&capture.proven?.get(id)===row.text+'\n')
+        if(capture.proven?.get(id)!==row.text+'\n')continue;
+        const body=normalize(row.text);
+        if(body&&parts.some(part=>part.includes(body)))
             result.push({...row,sourceVerified:true,status:'matched',tokens:null});
     }
     return result;
 }
 export function hasCompleteEvidence(capture){
     if(capture?.source!=='request'||capture.truncated||capture.promptLimited)return false;
-    const ids=new Set();
+    const ids=new Set(),verified=new Set(verifiedInsightRows(capture).map(row=>metricsKey(row.entry)));
     for(const row of capture.rows){
         const id=metricsKey(row.entry);
         if(ids.has(id))return false;ids.add(id);
-        if(!(row.text.trim()&&capture.proven?.get(id)===row.text+'\n')&&!capture.excluded?.has(id))return false;
+        if(!verified.has(id)&&!capture.excluded?.has(id))return false;
     }
     return true;
 }
