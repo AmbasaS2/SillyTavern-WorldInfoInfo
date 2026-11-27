@@ -20,6 +20,26 @@ test('ST 1.19.1 real request: strict book/insight membership and lazy rendering'
    if(/\.(?:js|mjs|css)$/.test(name)&&!name.endsWith('.test.mjs')||name==='manifest.json')fs.copyFileSync(path.join(root,name),path.join(dest,name));
   }
   fs.cpSync(path.join(root,'i18n'),path.join(dest,'i18n'),{recursive:true});
+  // Synthetic diagnostics only, never part of the product.
+  function instrument(name,changes){
+   const file=path.join(dest,name);let source=fs.readFileSync(file,'utf8');
+   for(const [from,to] of changes){assert.ok(source.includes(from),'diagnostic anchor '+from);source=source.replace(from,()=>to);}
+   fs.writeFileSync(file,source);
+  }
+  instrument('prompt-inclusion.mjs',[
+   ["if(limited||!nodes||!extensions||!Array.isArray(source)||source.length>LIMIT){latest=null;return;}","if(limited||!nodes||!extensions||!Array.isArray(source)||source.length>LIMIT){console.log('[WII-QA] invalid native trace',JSON.stringify({limited,nodes:!!nodes,extensions:!!extensions,source:Array.isArray(source)}));latest=null;return;}"],
+   ["take(){const result=latest;release();latest=null;return result;}","take(){const result=latest;console.log('[WII-QA] native take',JSON.stringify(result?{squashed:result.squashed,nodes:result.nodes.map(n=>[n.id,n.role,n.name,n.content?.length]),history:result.history.size}:null));release();latest=null;return result;}"],
+   ["if(blocks.length!==messages.length)return null;","if(blocks.length!==messages.length){console.log('[WII-QA] align count',JSON.stringify({blocks:blocks.map(b=>[b.nodes.map(n=>n.id),b.role,b.content?.length]),messages:messages.map(m=>[m.role,m.name,m.content?.length])}));return null;}"],
+   ["if(!message||message.role!==block.role||message.content!==block.content||(message.name||'')!==block.name)return null;","if(!message||message.role!==block.role||message.content!==block.content||(message.name||'')!==block.name){console.log('[WII-QA] align mismatch',JSON.stringify({i,block:[block.nodes.map(n=>n.id),block.role,block.name,block.content?.length,block.content?.slice(0,80)],message:[message?.role,message?.name,message?.content?.length,message?.content?.slice(0,80)]}));return null;}"],
+   ["if(!trace||capture.truncated||capture.observed!==capture.rows.length)return {blocks,excluded};","if(!trace||capture.truncated||capture.observed!==capture.rows.length){console.log('[WII-QA] no trace evidence',JSON.stringify({trace:!!trace,truncated:capture.truncated,observed:capture.observed,rows:capture.rows.length}));return {blocks,excluded};}"],
+   ["if(!aligned)return {blocks,excluded};","if(!aligned){console.log('[WII-QA] no alignment',JSON.stringify({traceSquashed:trace.squashed,infoSquashed:info.squashed}));return {blocks,excluded};}"],
+   ["}catch{return {blocks:[],excluded:new Map()};}","}catch(e){console.log('[WII-QA] evidence error',String(e),e.stack);return {blocks:[],excluded:new Map()};}"],
+  ]);
+  instrument('lore-insight.mjs',[
+   ["const structural=[...traced.blocks,...buildStructuredProof(capture,requestInfo)];","const structural=[...traced.blocks,...buildStructuredProof(capture,requestInfo)];console.log('[WII-QA] structural',JSON.stringify({trace:!!requestInfo.trace,squashed:requestInfo.squashed,blocks:structural.map(b=>b.entries.map(e=>e.key))}));"],
+   ["if(latest!==capture||capture.chatId!==getChatId()||!matches(data))return;","if(latest!==capture||capture.chatId!==getChatId()||!matches(data)){console.log('[WII-QA] request not matched',JSON.stringify({type:data?.type,expected:requestInfo.type,count:data?.messages?.length}));return;}"],
+   ["capture.proven=confirmStructuredProof(structural,data.messages);","capture.proven=confirmStructuredProof(structural,data.messages);console.log('[WII-QA] proven',JSON.stringify([...capture.proven.keys()]));"]
+  ]);
   const config=path.join(tmp,'config.yaml');fs.copyFileSync(path.join(host,'default/config.yaml'),config);
   const port=18749,url='http://127.0.0.1:'+port;
   // Bypass only the synthetic profile's first-run username dialog.
@@ -35,7 +55,7 @@ test('ST 1.19.1 real request: strict book/insight membership and lazy rendering'
   browser=await chromium.launch({executablePath:'/usr/bin/google-chrome',headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
   page=await browser.newPage({viewport:{width:1280,height:900}});const requests=[];
   page.on('pageerror',e=>errors.push(e.message));
-  page.on('console',m=>{if(m.type()==='warning'||m.type()==='error'||/\[WI\].*(Adding|DONE)/.test(m.text())){consoleTail.push(m.text().slice(0,240));if(consoleTail.length>30)consoleTail.shift();}});
+  page.on('console',m=>{if(m.text().startsWith('[WII-QA]'))console.log(m.text());if(m.type()==='warning'||m.type()==='error'||/\[WI\].*(Adding|DONE)/.test(m.text())){consoleTail.push(m.text().slice(0,240));if(consoleTail.length>30)consoleTail.shift();}});
   let releaseResponse=null;
   await page.route('**/*',async route=>{
    const req=route.request(),u=new URL(req.url());
