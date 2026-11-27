@@ -22,7 +22,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 ## Who is this for?
 
 - See which lorebooks and entries are confirmed to be in the latest visible RP request.
-- Find out why an entry was not inserted, could not be verified, or did not activate when a reason was recorded.
+- Inspect confirmed exclusions from activated lore, and the count whose insertion cannot be verified.
 - Find out why a lore entry activated: matched primary/secondary keywords, constant injection, confirmed vector retrieval, Sticky continuation, external activation or @@activate.
 - Troubleshoot unexpected or missing lore using the keyword-frequency and recursion-round report, Sticky counts and injection order.
 - Read formatted lore or saved translations in the chat without opening the editor or paying for another translation.
@@ -164,6 +164,8 @@ Right-click the book (long-press on mobile) → **View Lore Insight**. You can o
 - Expand the entries to see per-entry estimates and recorded reasons. The combined estimate and the sum of individual estimates are different measurements.
 
 **Why is a lore missing from the book list?**
+
+<p align="left"><img src="assets/readme/mobile/ui-lore-insight-details.svg" alt="Confirmed insertion and exclusion details" width="480" /></p>
 
 
 | Section | What it means |
@@ -425,6 +427,8 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 **‘발동했는데 왜 책 목록에 없지?’**
 
+<p align="left"><img src="assets/readme/mobile/ui-lore-insight-details.svg" alt="확인된 주입 및 제외 상세" width="480" /></p>
+
 
 | 구획 | 뜻 |
 | --- | --- |
@@ -476,7 +480,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ### 🔮 Jev 표시 연동
 
-기존 호환 버전에서 제공하던 🔮 Jev 표시를 유지합니다. 최신 월드인포인포(.13)와 STLO(.6)는 실제 요청의 주입 확인 항목과 계측을 연동해요. 목록·열람창·기록된 재귀 보고서와 로어 인사이트에서 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
+기존 호환 버전에서 제공하던 🔮 Jev 표시를 유지합니다. 최신 월드인포인포(.14)와 STLO(.7)는 실제 요청의 주입 확인 항목과 계측을 연동해요. 목록·열람창·기록된 재귀 보고서와 로어 인사이트에서 확인할 수 있습니다. 둘 중 하나만 설치하거나 구버전을 사용해도 각 확장의 기본 기능은 유지됩니다.
 
 **안내 기준:** 1.7.1-ambasa.14. 실제 요청 삽입 확인·로어 인사이트·STLO 통계 연동의 세부 범위와 검증 이력은 [개발 기록](docs/lore-insight-v1.md)을 참고하세요.
 
