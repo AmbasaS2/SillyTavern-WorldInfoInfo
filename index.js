@@ -1557,7 +1557,7 @@ const init = ()=>{
         // Native assembly starts after this event; no temporary hooks during
         // the scan or Jev requests, or when there are no candidates to verify.
         releasePromptTrace();
-        if(filtered.length&&main_api==='openai')promptTrace=observePromptAssembly(promptManager,()=>extension_prompts,generationType,noteBeforeScan);
+        if(filtered.length&&main_api==='openai')promptTrace=observePromptAssembly(promptManager,()=>extension_prompts,generationType,noteBeforeScan,insightOpenAI.Message);
         // Never publish scan candidates, even for ordinary or constant lore.
     };
     eventSource.on(event_types.WORLD_INFO_ACTIVATED, onWorldInfoActivated);
@@ -1571,7 +1571,7 @@ const init = ()=>{
         const complete=canReplaceReport(build,observedActivatedCount,candidates);
         const captured=build??stwiiCurrentBuild;
         let trace=null,insightCapture=null;
-        try{trace=promptTrace?.take()??null;}catch{releasePromptTrace();}
+        try{trace=promptTrace?.take(data?.prompt)??null;}catch{releasePromptTrace();}
         promptTrace=null;
         try{
             insightCapture=STWII.loreInsight?.beginCapture(serial,chatId,observedActivatedCount);
@@ -1620,7 +1620,7 @@ const init = ()=>{
         }
         try{
             if(insightCapture)STWII.loreInsight?.finish(insightCapture,complete,main_api==='openai'
-                ?{messages:data?.prompt,type:generationType,structure:promptManager.messages,trace,
+                ?{messages:data?.prompt,type:generationType,structure:trace?.structure??null,trace,
                     squashed:getContext()?.chatCompletionSettings?.squash_system_messages===true,
                     beforePosition:world_info_position.before,afterPosition:world_info_position.after,
                     depthPosition:world_info_position.atDepth,anTopPosition:world_info_position.ANTop,

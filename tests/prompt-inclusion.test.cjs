@@ -55,7 +55,6 @@ test('observing native assembly preserves returns and restores inherited methods
  const prompts=manager.getPromptCollection('normal');
  const root={getCollection:()=>[{identifier:'main',getCollection:()=>[{identifier:'main',role:'system',content:prompts.collection[0].content}]}]};
  assert.equal(manager.setChatCompletion({getMessages:()=>root}),42);
- assert.equal(manager.preparePrompt,original.preparePrompt);
  const trace=observer.take();
  assert.equal(manager.preparePrompt,original.preparePrompt);assert.equal(Object.hasOwn(manager,'preparePrompt'),false);
  const {capture,info}=fixture([row(1,7,'value',{outletName:'memory'})],[],[req('value')]);
@@ -68,4 +67,106 @@ test('nonactivated entries carry only bounded metadata and actual logged reasons
  assert.equal(result.rows.length,1);assert.equal(result.rows[0].reason,'cooldown');assert.equal('content' in result.rows[0].entry,false);
  assert.equal(scanSkipReason('suppressed by cooldown'),'cooldown');assert.equal(scanSkipReason('activated because of constant'),null);
  assert.equal(collectNonactivated({globalLore:[a,b]},[],null,1).limited,true);
+});
+
+test('unrelated opaque macro or conditional group cannot erase exact depth proof',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,4,'depth memory',{depth:1,role:0})];
+ const nodes=[node('chatHistory-3','depth memory','chatHistory'),node('chatHistory-4','old chat','chatHistory','user'),node('chatHistory-1','expanded value','chatHistory','assistant'),node('chatHistory-2','older','chatHistory','user')];
+ const ordered=[nodes[2],nodes[3],nodes[0],nodes[1]];
+ const {capture,info,trace}=fixture(rows,ordered,ordered.map(n=>req(n.content,n.role)),{trace:{
+  extensions:new Map([['customDepthWI_1_0',{value:'depth memory',position:1,depth:1,role:0}],['other',{value:'{{getvar::example}}',position:1,depth:3,role:2,dynamic:true}]]),
+  history:new Map([['chatHistory-4',{raw:'old chat',content:'old chat',role:'user'}],['chatHistory-3',{raw:'depth memory',content:'depth memory',role:'system'}],['chatHistory-2',{raw:'older',content:'older',role:'user'}],['chatHistory-1',{raw:'expanded value',content:'expanded value',role:'assistant'}]])
+ }});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+ trace.history.get('chatHistory-3').raw='different';
+ assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,0);
+});
+test('uncertain earlier slot and identical chat text do not become proof',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,4,'depth memory',{depth:1,role:0})];
+ const nodes=[node('chatHistory-1','older','chatHistory','user'),node('chatHistory-2','depth memory','chatHistory'),node('chatHistory-3','depth memory','chatHistory'),node('chatHistory-4','maybe macro','chatHistory')];
+ const {capture,info,trace}=fixture(rows,nodes,nodes.map(n=>req(n.content,n.role)),{trace:{
+  extensions:new Map([['unknown',{value:'{{getvar::example}}',position:1,depth:0,role:0}],['customDepthWI_1_0',{value:'depth memory',position:1,depth:1,role:0}]]),
+  history:new Map(nodes.map(n=>[n.id,{raw:n.content,content:n.content,role:n.role}]))
+ }});
+ assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,0);
+});
+test('absolute main and relative prompt moved into its native bucket preserve separate depth lore',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,4,'memory',{depth:1,role:0})];
+ const nodes=[node('chatHistory-1','older','chatHistory','user'),node('chatHistory-2','memory','chatHistory'),node('chatHistory-3','recent','chatHistory','user'),node('chatHistory-4','main\nnote','chatHistory')];
+ const {capture,info,trace}=fixture(rows,nodes,nodes.map(n=>req(n.content,n.role)),{trace:{
+  prompts:[{id:'main',position:1,depth:0,role:'system',order:100,content:'main'},{id:'authorsNote',position:0,relativePosition:'end',role:'system',content:'note'}],
+  extensions:new Map([['customDepthWI_1_0',{value:'memory',position:1,depth:1,role:0}]]),
+  history:new Map(nodes.map(n=>[n.id,{raw:n.content,content:n.content,role:n.role}]))
+ }});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
+test('whole-prompt diagnostic limit does not erase actual dedicated source proof',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const nodes=[node('worldInfoAfter','Real'),node('chatHistory-1','x'.repeat(530000),'chatHistory','user')];
+ const {capture,info,trace}=fixture([row(1,1,'Real')],nodes,nodes.map(n=>req(n.content,n.role)));
+ capture.promptLimited=true;
+ assert.equal(buildTraceEvidence(capture,info,trace).blocks.length,1);
+});
+
+test('concurrent native assemblies reuse history IDs without stealing the live request trace',async()=>{
+ const {observePromptAssembly,buildTraceEvidence}=await mod();
+ class NativeMessage{
+  static fromPromptAsync(p){return Promise.resolve({identifier:p.identifier,role:p.role,content:p.content});}
+ }
+ const originalFrom=NativeMessage.fromPromptAsync;
+ const manager={
+  serviceSettings:{squash_system_messages:true},
+  getPromptCollection(){return {collection:[this.preparePrompt({identifier:'main',role:'system',content:'main'})]};},
+  preparePrompt(p){return {...p};},
+  setChatCompletion(c){this.messages=c.getMessages();}
+ };
+ const original=manager.preparePrompt,ext={customDepthWI_0_0:{value:'live memory',position:1,depth:0,role:0}};
+ const obs=observePromptAssembly(manager,()=>ext,'normal',null,NativeMessage);
+ const live=manager.getPromptCollection('normal'),dry=manager.getPromptCollection('normal');
+ const dryPrompt=manager.preparePrompt({identifier:'chatHistory-2',role:'user',content:'dry old text'});
+ const livePrompt=manager.preparePrompt({identifier:'chatHistory-2',role:'system',content:'live memory'});
+ const [dryMain,liveMain,dryMessage,liveMessage,liveOld]=await Promise.all([
+  NativeMessage.fromPromptAsync(dry.collection[0]),NativeMessage.fromPromptAsync(live.collection[0]),
+  NativeMessage.fromPromptAsync(dryPrompt),NativeMessage.fromPromptAsync(livePrompt),
+  NativeMessage.fromPromptAsync(manager.preparePrompt({identifier:'chatHistory-1',role:'user',content:'old'}))
+ ]);
+ const make=(main,history)=>({getMessages:()=>({getCollection:()=>[
+  {identifier:'main',getCollection:()=>[main]},{identifier:'chatHistory',getCollection:()=>history}
+ ]}),getChat:()=>[req(main.content),...history.map(n=>req(n.content,n.role))]});
+ const dryCompletion=make(dryMain,[dryMessage]),liveCompletion=make(liveMain,[liveOld,liveMessage]);
+ manager.setChatCompletion(dryCompletion);const dryArray=dryCompletion.getChat();
+ manager.setChatCompletion(liveCompletion);const liveArray=liveCompletion.getChat();
+ assert.equal(dryArray[1].content,'dry old text');
+ const trace=obs.take(liveArray);
+ assert.equal(trace.history.get('chatHistory-2').raw,'live memory');
+ assert.equal(trace.collectionKnown,true);
+ assert.equal(trace.structure.getCollection()[1].getCollection()[1],liveMessage);
+ assert.equal(manager.preparePrompt,original);assert.equal(NativeMessage.fromPromptAsync,originalFrom);
+ const {capture,info}=fixture([row(1,4,'live memory',{depth:0,role:0})],[],liveArray,{info:{squashed:true}});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
+
+test('squashing preserves the native break caused by an empty non-system message',async()=>{
+ const {buildTraceEvidence}=await mod();
+ const rows=[row(1,1,'Real')],nodes=[node('main','main'),node('chatHistory-1','','chatHistory','assistant'),node('worldInfoAfter','Real')];
+ const {capture,info,trace}=fixture(rows,nodes,[req('main'),req('Real')],{info:{squashed:true},trace:{squashed:true}});
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
+
+test('sparse native preset indices do not erase verified evidence for other prompts',async()=>{
+ const {observePromptAssembly,buildTraceEvidence}=await mod();
+ const manager={serviceSettings:{squash_system_messages:false},getPromptCollection(){return {collection:[]}},preparePrompt(p){return p},setChatCompletion(c){this.messages=c.getMessages();}};
+ const observer=observePromptAssembly(manager,()=>({}),'normal');
+ manager.getPromptCollection('normal');
+ const items=[];
+ items[2]={identifier:'worldInfoAfter',getCollection:()=>[{identifier:'worldInfoAfter',role:'system',content:'Real'}]};
+ const c={getMessages:()=>({getCollection:()=>items}),getChat:()=>[req('Real')]};
+ manager.setChatCompletion(c);
+ const messages=c.getChat(),trace=observer.take(messages);
+ const {capture,info}=fixture([row(1,1,'Real')],[],messages);
+ assert.equal(trace.nodes.length,1);
+ assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
 });

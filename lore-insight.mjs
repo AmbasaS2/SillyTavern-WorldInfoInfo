@@ -23,12 +23,12 @@ export function createInsightCapture(serial,chatId,observed,scope=null) {
     let chars=0;
     const capture={
         serial,chatId,observed,scope,rows:[],parts:null,source:'assembled',promptLimited:false,truncated:false,measurement:null,
-        nonactivated:[],nonactivatedLimited:false,proven:new Map(),excluded:new Map(),inspection:null,
+        nonactivated:[],nonactivatedLimited:false,proven:new Map(),excluded:new Map(),inspection:null,requestProofChecked:false,
         setPrompt(parts,_normalized,source='assembled') {
             capture.source=source;
             capture.parts=boundedParts(parts);
             capture.promptLimited=capture.parts===null;
-            capture.measurement=null;capture.inspection=null;capture.proven=new Map();capture.excluded=new Map();
+            capture.measurement=null;capture.inspection=null;capture.proven=new Map();capture.excluded=new Map();capture.requestProofChecked=false;
         },
         add(entry,rendered,outlet=false) {
             if(typeof rendered!=='string')rendered='';
@@ -128,8 +128,9 @@ export function inspectInsight(capture) {
     for(const row of rows){
         const id=metricsKey(row.entry),proven=capture.proven?.get(id);
         const original=normalize(row.originalText);
-        row.sourceVerified=capture.source==='request'&&!capture.promptLimited&&!!original&&
-            typeof proven==='string'&&proven===row.originalText+'\n'&&parts.some(part=>part.includes(original));
+        row.sourceVerified=capture.source==='request'&&!!original&&
+            typeof proven==='string'&&proven===row.originalText+'\n'&&
+            (capture.promptLimited?capture.requestProofChecked===true:parts.some(part=>part.includes(original)));
         if(row.sourceVerified){row.status='matched';row.text=row.originalText;}
         else if(capture.excluded?.has(id)){row.status='excluded';row.exclusion=capture.excluded.get(id);}
     }
@@ -141,7 +142,7 @@ export function getInsightRows(capture){
     return capture.inspection??(capture.inspection=inspectInsight(capture));
 }
 export function verifiedInsightRows(capture){
-    if(capture?.source!=='request'||capture.promptLimited)return [];
+    if(capture?.source!=='request'||capture.promptLimited&&capture.requestProofChecked!==true)return [];
     if(capture.inspection)return capture.inspection.filter(row=>row.sourceVerified);
     const result=[],seen=new Set();
     // Check only structurally proven rows, never run diagnostic searches here.
@@ -153,13 +154,13 @@ export function verifiedInsightRows(capture){
         seen.add(id);
         if(capture.proven?.get(id)!==row.text+'\n')continue;
         const body=normalize(row.text);
-        if(body&&parts.some(part=>part.includes(body)))
+        if(body&&(capture.promptLimited?capture.requestProofChecked===true:parts.some(part=>part.includes(body))))
             result.push({...row,sourceVerified:true,status:'matched',tokens:null});
     }
     return result;
 }
 export function hasCompleteEvidence(capture){
-    if(capture?.source!=='request'||capture.truncated||capture.promptLimited)return false;
+    if(capture?.source!=='request'||capture.truncated||capture.promptLimited&&capture.requestProofChecked!==true)return false;
     const ids=new Set(),verified=new Set(verifiedInsightRows(capture).map(row=>metricsKey(row.entry)));
     for(const row of capture.rows){
         const id=metricsKey(row.entry);
@@ -227,7 +228,7 @@ export async function estimateInsight(rows,capture,countText,stillCurrent,allVis
     const result={total:previous?.total??null,prompt:previous?.prompt??null,limited:matched.length>MAX_MEASURE||capture.truncated||capture.promptLimited,failed:false};
     if(!stillCurrent())return null;
     const combined=matched.map(r=>r.text).join('\n');
-    if(matched.length&&combined.length<=MAX_CHARS&&!capture.truncated&&!capture.promptLimited){
+    if(matched.length&&combined.length<=MAX_CHARS&&!capture.truncated&&(!capture.promptLimited||capture.requestProofChecked===true)){
         if(!validCount(result.total))result.total=await countText(combined);
         if(!stillCurrent())return null;
         if(!validCount(result.total))result.failed=true;
@@ -303,7 +304,9 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         if(requestInfo&&typeof watchRequest==='function'){
             const matches=createRequestMatcher(requestInfo.messages,requestInfo.type);
             const traced=buildTraceEvidence(capture,requestInfo,requestInfo.trace);
-            const structural=requestInfo.trace?traced.blocks:buildStructuredProof(capture,requestInfo);
+            // The native trace and dedicated collections are independent evidence.
+            // A partial trace must not suppress exact dedicated-block proof.
+            const structural=[...traced.blocks,...buildStructuredProof(capture,requestInfo)];
             const assembled=Array.isArray(requestInfo.messages)&&requestInfo.messages.length<=4096?
                 requestInfo.messages.map(message=>({message,content:message?.content,role:message?.role,name:message?.name||''})):null;
             try{
@@ -312,8 +315,9 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
                     try{
                         capture.setPrompt(requestTextParts(data.messages),null,'request');
                         capture.scope=readScope();
-                        if(!capture.promptLimited){
+                        {
                             capture.proven=confirmStructuredProof(structural,data.messages);
+                            capture.requestProofChecked=true;
                             const unchanged=assembled&&data.messages.length===assembled.length&&assembled.every((item,i)=>
                                 data.messages[i]===item.message&&item.message.content===item.content&&item.message.role===item.role&&(item.message.name||'')===item.name);
                             capture.excluded=unchanged?traced.excluded:new Map();
