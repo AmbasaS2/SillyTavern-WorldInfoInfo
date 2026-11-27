@@ -29,7 +29,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.9.**
+**Current version: 1.7.1-ambasa.11.**
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
@@ -271,7 +271,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.9.**
+**현재 버전: 1.7.1-ambasa.11.**
 
 > **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
 >
@@ -419,5 +419,10 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 This project retains the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE).
 
 
-### Lore Insight (development branch)
-Right-click / long-press the book button and choose **View Lore Insight / 로어 인사이트 보기**. The separate read-only dialog distinguishes captured activation from assembled-prompt text matches; estimates are on demand, not API usage. The recovery command `/wi-position-reset` remains. See [measurement limits and integration](docs/lore-insight-v1.md).
+### Lore Insight
+Right-click / long-press the book button and choose **View Lore Insight / 로어 인사이트 보기**. The separate read-only dialog distinguishes captured activation from text matches in the assembled prompt or correlated pre-send request; estimates are on demand, not API usage. The recovery command `/wi-position-reset` remains. See [measurement limits and integration](docs/lore-insight-v1.md).
+
+
+**1.7.1-ambasa.11:** Standalone Lore Insight is available for early use. New STLO token reuse and detailed selection-reason integration, additional locale coverage, and full joint runtime regression are still pending. The legacy optional Jev marker remains supported. Rollback: 1.7.1-ambasa.10 (`342e92e`).
+
+**로어 인사이트(1.7.1-ambasa.11):** 책 버튼 우클릭/길게 누르기 후 **로어 인사이트 보기**를 누르세요. RP의 활성 로어와 요청 본문 일치 여부를 확인하고 필요할 때 토큰 추정치를 계산합니다. 신규 STLO 통계 연동과 전체 통합 검증은 추후 진행합니다. 기존 Jev 표시는 유지되며, 위치 복구는 `/wi-position-reset` 명령을 사용하세요.
