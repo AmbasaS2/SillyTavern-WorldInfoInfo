@@ -1620,7 +1620,7 @@ const init = ()=>{
         }
         try{
             if(insightCapture)STWII.loreInsight?.finish(insightCapture,complete,main_api==='openai'
-                ?{messages:data?.prompt,type:generationType,structure:promptManager.messages,trace,
+                ?{messages:data?.prompt,type:generationType,structure:trace?.structure??null,trace,
                     squashed:getContext()?.chatCompletionSettings?.squash_system_messages===true,
                     beforePosition:world_info_position.before,afterPosition:world_info_position.after,
                     depthPosition:world_info_position.atDepth,anTopPosition:world_info_position.ANTop,
