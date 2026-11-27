@@ -380,3 +380,40 @@
   .stwii--reader-dialog { padding: 12px; max-height: 86dvh; }
   .stwii--reader-body { min-height: 0; height: 62dvh; }
 }
+
+/* Separate Lore Insight dialog; scoped to its own UI. */
+.stwii--insight-button {
+  display:flex; align-items:center; justify-content:center; gap:7px;
+  width:100%; min-height:34px; box-sizing:border-box; margin-top:7px;
+  padding:6px 10px; border:1px solid var(--SmartThemeBorderColor,currentColor);
+  border-radius:7px; color:inherit; cursor:pointer; font:inherit;
+  background:var(--SmartThemeBlurTintColor,transparent);
+}
+.stwii--insight-button:focus-visible,.stwii--insight-measure:focus-visible {
+  outline:2px solid var(--SmartThemeEmColor,currentColor);outline-offset:2px;
+}
+.stwii--insight-dialog {width:min(640px,100%);max-height:min(86dvh,900px);gap:9px;}
+.stwii--insight-header {align-items:center;cursor:default;touch-action:auto;}
+.stwii--insight-title {margin:0;font-size:1.08em;font-weight:600;}
+.stwii--insight-body {min-height:0;overflow-y:auto;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:10px;}
+.stwii--insight-report {display:flex;flex-direction:column;gap:9px;}
+.stwii--insight-note {margin:0;font-size:.8em;opacity:.8;line-height:1.45;}
+.stwii--insight-grid {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;}
+.stwii--insight-card,.stwii--insight-section {
+  border:1px solid var(--SmartThemeBorderColor,currentColor);border-radius:8px;
+  padding:9px;min-width:0;background:var(--SmartThemeBlurTintColor,transparent);
+}
+.stwii--insight-card {display:flex;flex-direction:column;gap:4px;}
+.stwii--insight-card strong {font-size:1.2em;font-variant-numeric:tabular-nums;}
+.stwii--insight-card small,.stwii--insight-section small {opacity:.78;}
+.stwii--insight-section h4 {margin:0 0 7px;font-size:.95em;}
+.stwii--insight-line {display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:8px;align-items:center;padding:5px 0;}
+.stwii--insight-line + .stwii--insight-line,.stwii--insight-entry + .stwii--insight-entry {
+  border-top:1px solid color-mix(in srgb,var(--SmartThemeBorderColor,currentColor) 65%,transparent);
+}
+.stwii--insight-line strong,.stwii--insight-entry span {font-variant-numeric:tabular-nums;font-size:.85em;text-align:right;}
+.stwii--insight-entry {display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 8px;padding:7px 0;}
+.stwii--insight-entry small {grid-column:1;grid-row:2;}
+.stwii--insight-entry span {grid-column:2;grid-row:1 / span 2;align-self:center;}
+.stwii--insight-measure {min-height:36px;width:100%;box-sizing:border-box;flex-shrink:0;}
+@media(max-width:600px){.stwii--insight-dialog{padding:12px;max-height:86dvh}.stwii--insight-line{gap:5px}}

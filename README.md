@@ -126,7 +126,7 @@ Right-click the floating book on desktop or long-press it on mobile. Both the en
 | View original text | Off | Show original list titles and reader titles/bodies; skip translation lookup |
 | Link Lorebook Library | Off | Open the exact entry in the compatible library instead of the built-in reader |
 | Allow dragging the book button | Off | Move the floating book |
-| Reset book button position | Action | Restore the original position |
+| View Lore Insight | Action | Open the separate read-only RP lore analysis |
 
 > [!TIP]
 > To inspect the position of lore relative to chat messages, turn grouping off and keep injection ordering and message positions on.
@@ -363,7 +363,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 | 원문으로 보기 (View original text) | 꺼짐 | 목록 제목과 기본 열람창 제목·본문 원문 표시, 번역 조회 생략 |
 | 로어북 서가 연동 | 꺼짐 | 호환 로어북 매니저 서재에서 정확한 항목 열기 |
 | 책 버튼 드래그 허용 | 꺼짐 | 원하는 위치로 이동 |
-| 책 버튼 위치 초기화 | 실행 버튼 | 원래 위치로 복귀 |
+| 로어 인사이트 보기 | 실행 버튼 | 최근 RP 로어 분석 창 열기 |
 
 > [!TIP]
 > 책별 묶기만 끄고 주입 순서와 대화 메시지 위치 표시를 켜면 책 구분 없이 주입 배치를 확인할 수 있어요.
@@ -417,3 +417,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 - **This fork:** reading-oriented additions and optional integrations.
 
 This project retains the GNU Affero General Public License v3.0. See [LICENSE](./LICENSE).
+
+
+### Lore Insight (development branch)
+Right-click / long-press the book button and choose **View Lore Insight / 로어 인사이트 보기**. The separate read-only dialog distinguishes captured activation from assembled-prompt text matches; estimates are on demand, not API usage. The recovery command `/wi-position-reset` remains. See [measurement limits and integration](docs/lore-insight-v1.md).

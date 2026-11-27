@@ -16,6 +16,7 @@ import { tryOpenInLoreLibrary } from './lore-library-link.js';
 import { createJevRecallReceipts } from './jev-recall-display.js';
 import { readManagerTranslationBook, managerTranslatedTitle, managerTranslatedBody } from './lore-manager-translations.js';
 import { canReplaceReport, persistReport } from './report-storage.js';
+import { createLoreInsight, createInsightTokenCache, insightReason, canShowInsightWorld } from './lore-insight.mjs';
 
 
 // Localize only extension-authored UI. Lorebook text and stored translations are untouched.
@@ -91,7 +92,31 @@ const WI_UI_EN = {
     "report.entries": "Entries",
     "report.entryCount": "{0} entries",
     "report.noKeyword": "(no recorded keyword)",
-    "report.forceActivated": "(force activated)"
+    "report.forceActivated": "(force activated)",
+    "settings.insight.label": "View Lore Insight",
+    "settings.insight.hint": "Inspect the latest RP lore and token estimates.",
+    "insight.title": "Lore Insight",
+    "insight.waiting": "Available after the current reply finishes.",
+    "insight.empty": "No captured RP data in this chat. Generate a reply first.",
+    "insight.note": "Assembled prompt text evidence, not provider usage or proof of entry provenance. Repeated or overlapping text is ambiguous. Token estimates are on demand; grouped values sum individual estimates.",
+    "insight.activated": "Activated (visible)",
+    "insight.matched": "Text matched",
+    "insight.unresolved": "Not verified",
+    "insight.total": "Matched text · combined estimate",
+    "insight.share": "Matched text / assembled prompt text",
+    "insight.unmeasured": "Not measured",
+    "insight.unmatched": "Text not found",
+    "insight.unknown": "Unverified",
+    "insight.ambiguous": "Ambiguous match",
+    "insight.measure": "Calculate token estimates",
+    "insight.counting": "Counting…",
+    "insight.measured": "Token estimates calculated",
+    "insight.books": "By lorebook · matched / activated",
+    "insight.reasons": "By activation reason · matched / activated",
+    "insight.entries": "Lore entries",
+    "insight.visible": "Hidden lore excluded. Full-prompt ratio is not calculated.",
+    "insight.limit": "Capture or detail limit reached. Values may be partial; unmeasured values are not zero.",
+    "insight.multiple": "Multiple recorded reasons"
 };
 function wiT(key, ...values) {
     const source = WI_UI_EN[key] ?? key;
@@ -679,9 +704,10 @@ function renderedWiContent(entry) {
         return '';
     }
 }
-function confirmedWiEntries(entryList, generationData) {
+function confirmedWiEntries(entryList, generationData, insightCapture = null) {
     const parts = promptTextParts(generationData?.prompt ?? generationData?.input);
     const finalPrompt = parts.join('\n').replace(/\s+/g, ' ').trim();
+    insightCapture?.setPrompt(parts, finalPrompt);
 
     return entryList.filter(entry => {
         confirmedOutletEntries.delete(entry);
@@ -689,6 +715,7 @@ function confirmedWiEntries(entryList, generationData) {
         // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
         // 'No active entries' for ordinary (non-outlet) entries.
         const rendered = renderedWiContent(entry);
+        insightCapture?.add(entry, rendered);
         if (!rendered) return false;
         if (entry.position !== world_info_position.outlet) return true;
 
@@ -894,20 +921,22 @@ const init = ()=>{
             }
             configPanel.append(dragRow);
         }
-        // Reset position row
-        const resetRow = document.createElement('div'); {
-            resetRow.classList.add('stwii--configRow');
-            resetRow.title = wiT('settings.reset.hint');
-            resetRow.style.userSelect = 'none';
-            const resetLbl = document.createElement('div'); {
-                resetLbl.textContent = wiT('settings.reset.label');
-                resetRow.append(resetLbl);
-            }
-            resetRow.addEventListener('click', ()=>{
-                resetWiTriggerPosition(trigger);
-            });
-            configPanel.append(resetRow);
-        }
+        // Replace the settings action; retain the recovery slash command.
+        const insightButton = document.createElement('button');
+        insightButton.type = 'button';
+        insightButton.className = 'menu_button stwii--insight-button';
+        insightButton.title = wiT('settings.insight.hint');
+        const insightIcon = document.createElement('i');
+        insightIcon.className = 'fa-solid fa-chart-simple';
+        insightIcon.setAttribute('aria-hidden','true');
+        const insightLabel = document.createElement('span');
+        insightLabel.textContent = wiT('settings.insight.label');
+        insightButton.append(insightIcon, insightLabel);
+        insightButton.addEventListener('click', () => {
+            configPanel.classList.remove('stwii--isActive');
+            STWII.loreInsight?.open();
+        });
+        configPanel.append(insightButton);
         document.body.append(configPanel);
         STWII.trigger = trigger; STWII.panel = panel; STWII.configPanel = configPanel;
     }
@@ -1218,6 +1247,31 @@ const init = ()=>{
     let tokenSummaryPending = -1;
     let tokenSummaryRequest = 0;
     let tokenFooter = null;
+    // Do not share measurements unless the live tokenizer identity is known.
+    function loreTokenScope() {
+        try {
+            const ctx = getContext();
+            if (ctx?.mainApi !== 'openai' || !ctx.powerUserSettings) return null;
+            const model = ctx.getTokenizerModel?.();
+            if (!model) return null;
+            return JSON.stringify([generationSerial, getCurrentChatId(), ctx.mainApi,
+                ctx.chatCompletionSettings?.chat_completion_source, model, ctx.powerUserSettings.tokenizer]);
+        } catch { return null; }
+    }
+    const insightTokens = createInsightTokenCache(getTokenCountAsync, loreTokenScope);
+    const insight = createLoreInsight({
+        t: wiT, countText: insightTokens.countText, getScope: loreTokenScope,
+        getChatId: getCurrentChatId,
+        getReason: entry => insightReason(entry, displayedActivationEvents.get(entry)),
+        titleFor: displayWiTitle,
+        isVisible: world => canShowInsightWorld(world, isAdmin(),
+            typeof getCurrentUserHandle === 'function' ? getCurrentUserHandle() : ''),
+        reasonLabel: reason => reason === 'multiple' ? wiT('insight.multiple') : wiT('reader.reason.' + reason),
+    });
+    STWII.loreInsight = insight;
+    const tokenBridge = Object.freeze({ apiVersion: 1, count: insightTokens.countText });
+    STWII.loreTokenCountV1 = tokenBridge;
+
 
     const showTokenTotal = () => extension_settings.worldInfoInfo?.showTokenTotal === true;
     // Only show the result after a real, nonempty injection has been counted.
@@ -1274,7 +1328,7 @@ const init = ()=>{
             try {
                 const texts = currentEntryList.filter(entry => entry?.type === 'wi')
                     .map(renderedWiContent).filter(Boolean);
-                const result = texts.length ? await getTokenCountAsync(texts.join('\n')) : 0;
+                const result = texts.length ? await insightTokens.countText(texts.join('\n')) : 0;
                 if (Number.isFinite(result) && result >= 0) count = Math.round(result);
             } catch {
                 // Counting is optional. A tokenizer error must never affect lore.
@@ -1310,6 +1364,8 @@ const init = ()=>{
         // reply's World Info. A quietToLoud generation *is* user-visible.
         if (dryRun || (type === 'quiet' && !options?.quietToLoud)) return;
         generationSerial++;
+        insight.start();
+        insightTokens.clear();
         generationType = type;
         jevRecall.reset();
         realGenerationInProgress = true;
@@ -1339,6 +1395,8 @@ const init = ()=>{
 
     eventSource.on(event_types.GENERATION_STARTED, beginRealGeneration);
     const onChatChanged = () => {
+        insight.clear();
+        insightTokens.clear();
         generationSerial++;
         jevRecall.reset();
         realGenerationInProgress = false;
@@ -1412,7 +1470,8 @@ const init = ()=>{
         realGenerationInProgress = false;
         releaseWorldInfoConsoleCapture();
         const candidates = pendingEntries;
-        const included = confirmedWiEntries(candidates, data);
+        const insightCapture = STWII.loreInsight?.beginCapture(generationSerial, getCurrentChatId(), observedActivatedCount);
+        const included = confirmedWiEntries(candidates, data, insightCapture);
         jevRecall.reset();
         pendingEntries = [];
         // Repaint only if an outlet is confirmed or sticky metadata changed;
@@ -1457,6 +1516,7 @@ const init = ()=>{
         } catch (error) {
             console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Report storage failed; previous metadata retained', error);
         }
+        STWII.loreInsight?.finish(insightCapture, complete);
         lastReportBuild = null;
         stwiiCurrentBuild = null;
     };
@@ -1468,12 +1528,15 @@ const init = ()=>{
         releaseWorldInfoConsoleCapture();
         if (!tokenGenerationAwaitingEnd) return;
         tokenGenerationAwaitingEnd = false;
+        insight.ready();
         syncTokenFooter();
         if (panel.classList.contains('stwii--isActive')) scheduleTokenSummary();
     };
     eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);
     eventSource.on(event_types.MESSAGE_RECEIVED, onCompletedGeneration);
     const onGenerationStopped = () => {
+        insight.clear();
+        insightTokens.clear();
         resetJevRecall();
         releaseWorldInfoConsoleCapture();
         if (!realGenerationInProgress) return;
@@ -2286,6 +2349,10 @@ function endBuildSession() {
 
 // Optional teardown to remove UI and unpatch console
 window.STWII.destroy = function() {
+    insight.clear();
+    insightTokens.clear();
+    if (STWII.loreInsight === insight) delete STWII.loreInsight;
+    if (STWII.loreTokenCountV1 === tokenBridge) delete STWII.loreTokenCountV1;
     tokenSummaryRequest++;
     tokenSummaryPending = -1;
     realGenerationInProgress = false;
