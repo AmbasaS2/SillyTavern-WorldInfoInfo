@@ -783,6 +783,18 @@ function applyConfirmedWiEntries(capture){
     });
 }
 
+// Only the boundary sentences are displayed. Avoid materializing every sentence
+// in a potentially very long chat range. Keep the same Intl.Segmenter boundaries.
+function messageRangeSentences(segmenter, text) {
+    const segments = segmenter.segment(text);
+    const first = segments.containing(0);
+    const last = segments.containing(text.length - 1);
+    return {
+        first: first?.segment.trim(),
+        last: first && last && first.index !== last.index ? last.segment.trim() : null,
+    };
+}
+
 let generationType;
 
 const init = ()=>{
@@ -1785,14 +1797,14 @@ const init = ()=>{
                                 .filter(it=>it.length)
                                 .join('\n')
                             ;
-                            const sentences = [...segmenter.segment(text)].map(it=>it.segment.trim());
+                            const sentences = messageRangeSentences(segmenter, text);
                             entries.splice(i + 1, 0, {
                                 type: 'mes',
                                 count: mesList.length,
                                 from: depth + 1,
                                 to: currentDepth,
-                                first: sentences.at(0),
-                                last: sentences.length > 1 ? sentences.at(-1) : null,
+                                first: sentences.first,
+                                last: sentences.last,
                             });
                             currentDepth = -1;
                             continue;
@@ -1813,14 +1825,14 @@ const init = ()=>{
                             .filter(it=>it.length)
                             .join('\n')
                         ;
-                        const sentences = [...segmenter.segment(text)].map(it=>it.segment.trim());
+                        const sentences = messageRangeSentences(segmenter, text);
                         entries.splice(i + 1, 0, {
                             type: 'mes',
                             count: mesList.length,
                             from: depth + 1,
                             to: currentDepth,
-                            first: sentences.at(0),
-                            last: sentences.length > 1 ? sentences.at(-1) : null,
+                            first: sentences.first,
+                            last: sentences.last,
                         });
                         currentDepth = depth;
                     }
