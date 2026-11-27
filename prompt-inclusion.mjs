@@ -106,8 +106,9 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null,
             }
         });
         wrap('setChatCompletion',([completion])=>{
-            const nodes=flatMessages(completion?.getMessages?.(),native?message=>receipts.get(message):null);
-            if(!nodes)return;
+            const structure=completion?.getMessages?.();
+            if(!structure)return;
+            const nodes=flatMessages(structure,native?message=>receipts.get(message):null)??[];
             const anchors=new Set(nodes.map(n=>n.receipt?.prompt).filter(Boolean));
             const candidates=collections.filter(c=>c.type===type&&Array.isArray(c.collection?.collection));
             const matched=candidates.filter(c=>c.collection.collection.some(prompt=>anchors.has(prompt)));
@@ -135,7 +136,7 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null,
                 for(const [id,r] of legacyHistory){if(r.ambiguous){historyKnown=false;break;}history.set(id,r);}
             }
             if(!historyKnown)history.clear();
-            const snapshot={nodes:nodes.map(({receipt,...node})=>node),extensions:collectionKnown?chosen.extensions:new Map(),
+            const snapshot={structure,nodes:nodes.map(({receipt,...node})=>node),extensions:collectionKnown?chosen.extensions:new Map(),
                 prompts:collectionKnown?prompts:[],history,noteBase,collectionKnown,
                 disabledBefore:collectionKnown&&chosen.disabledBefore,disabledAfter:collectionKnown&&chosen.disabledAfter,
                 squashed:manager.serviceSettings?.squash_system_messages===true,
@@ -164,21 +165,24 @@ function align(trace,messages,squashed){
     const blocks=[];let last=null,size=0;
     for(const node of trace.nodes){
         if(squashed&&node.role==='system'&&!node.content)continue;
-        if(!node.content&&!node.tools)continue;
+        // In a squashed request an empty non-system native message still
+        // breaks adjacent system blocks; getChat drops it only afterwards.
+        if(!squashed&&!node.content&&!node.tools)continue;
         const merge=squashed&&node.role==='system'&&!node.name&&!squashExcluded.has(node.id)&&isText(node.content);
         if(merge&&last?.merge){last.content+='\n'+node.content;last.nodes.push(node);}
         else{last={content:node.content,role:node.role,name:node.name,merge,nodes:[node],entries:[]};blocks.push(last);}
         if((size+=(node.content?.length??0)+1)>TRACE_CHARS)return null;
     }
-    if(blocks.length!==messages.length)return null;
+    const emitted=blocks.filter(block=>block.content||block.nodes.some(node=>node.tools));
+    if(emitted.length!==messages.length)return null;
     const byNode=new Map();
-    for(let i=0;i<blocks.length;i++){
-        const block=blocks[i],message=messages[i];
+    for(let i=0;i<emitted.length;i++){
+        const block=emitted[i],message=messages[i];
         if(!message||message.role!==block.role||message.content!==block.content||(message.name||'')!==block.name)return null;
         block.message=message;block.text=block.content;
         for(const node of block.nodes)byNode.set(node,block);
     }
-    return {blocks,byNode};
+    return {blocks:emitted,byNode};
 }
 const orderRows=rows=>rows.slice().sort((a,b)=>b.entry.order-a.entry.order);
 function validGroup(rows){
