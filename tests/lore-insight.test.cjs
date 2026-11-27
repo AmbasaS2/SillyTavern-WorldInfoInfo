@@ -307,3 +307,17 @@ test('closed disclosure creates no rows, automatic token updates preserve expand
   insight.clear();
  }finally{global.document=old;}
 });
+
+test('long actual request retains exact independent dedicated proof even when native trace is incomplete',async()=>{
+ const {createLoreInsight,verifiedInsightRows,inspectInsight}=await mod();
+ let listener,final;
+ const insight=createLoreInsight({t:k=>k,countText:async()=>1,getScope:()=> 'scope',getChatId:()=> 'chat',getReason:()=> 'constant',titleFor:e=>e.comment,isVisible:()=>true,reasonLabel:r=>r,watchRequest:fn=>{listener=fn;return()=>{listener=null}}});
+ const real={role:'system',content:'Real'},old={role:'user',content:'x'.repeat(530000)+' Decoy'};
+ const cap=insight.beginCapture(1,'chat',2);cap.add({...entry(1),position:0,order:100},'Real');cap.add({...entry(2),position:4,order:100},'Decoy');cap.setPrompt(null,null);
+ const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...real,identifier:'worldInfoBefore'}]},{identifier:'chatHistory',getCollection:()=>[{...old,identifier:'chatHistory-1'}]}]};
+ insight.finish(cap,true,{messages:[real,old],type:'normal',structure,beforePosition:0,formatWorldInfo:s=>s,trace:{nodes:[],squashed:false}},c=>{final=c;});
+ listener({type:'normal',messages:[real,old]});
+ assert.equal(final.promptLimited,true);assert.deepEqual(verifiedInsightRows(final).map(r=>r.entry.uid),[1]);
+ assert.equal(inspectInsight(final)[1].sourceVerified,false);
+ insight.clear();
+});
