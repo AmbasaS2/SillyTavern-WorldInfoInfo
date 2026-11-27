@@ -28,7 +28,7 @@ export function createInsightCapture(serial,chatId,observed,scope=null) {
             capture.source=source;
             capture.parts=boundedParts(parts);
             capture.promptLimited=capture.parts===null;
-            capture.measurement=null;capture.inspection=null;
+            capture.measurement=null;capture.inspection=null;capture.proven=new Map();capture.excluded=new Map();
         },
         add(entry,rendered,outlet=false) {
             if(typeof rendered!=='string')rendered='';
@@ -127,7 +127,9 @@ export function inspectInsight(capture) {
     // elsewhere. The evidence publisher never uses ordinary substring matches.
     for(const row of rows){
         const id=metricsKey(row.entry),proven=capture.proven?.get(id);
-        row.sourceVerified=!capture.promptLimited&&typeof proven==='string'&&proven===row.originalText+'\n';
+        const original=normalize(row.originalText);
+        row.sourceVerified=capture.source==='request'&&!capture.promptLimited&&!!original&&
+            typeof proven==='string'&&proven===row.originalText+'\n'&&parts.some(part=>part.includes(original));
         if(row.sourceVerified){row.status='matched';row.text=row.originalText;}
         else if(capture.excluded?.has(id)){row.status='excluded';row.exclusion=capture.excluded.get(id);}
     }

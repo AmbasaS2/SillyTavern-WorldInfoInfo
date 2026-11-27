@@ -20,7 +20,7 @@ function fixture() {
         currentEntryList: [], currentChat: [], currentChatNote: '', currentChatNoteDepth: undefined,
         panelNeedsRender: false, lastRenderedGenerationEntries: null, tokenFooter: null,
         panel: { textContent: '', classList: { contains: () => open } },
-        syncTokenFooter() {},
+        syncTokenFooter() {},wiT:key=>key,
         updateBadge(ids) { badges.push(Array.from(ids)); },
         renderPanelContents(list) {
             renders.push({ ids: Array.from(list, e => e.uid),
@@ -58,7 +58,7 @@ test('hidden scans update the badge, not the detail DOM; opening uses the latest
     h.activate([]);
     h.open();
     assert.equal(h.renders.length, 2);
-    assert.equal(h.context.panel.textContent, '?');
+    assert.equal(h.context.panel.textContent, 'panel.noneVerified');
 });
 test('closed settings changes defer repaint; the open trigger flushes before positioning', () => {
     const h = fixture();

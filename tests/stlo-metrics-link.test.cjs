@@ -49,3 +49,13 @@ test('mismatched or squashed prompt, duplicate keys, truncation, hidden entries 
  assert.equal(buildInjectionRecords(capture,w=>w!=='Hidden',true).complete,false);
  capture.truncated=true;assert.equal(buildStructuredProof(capture,info).length,0);
 });
+
+test('format without lore content and altered request cannot prove insertion',async()=>{
+ const {buildStructuredProof,confirmStructuredProof}=await mod();
+ const {capture,info,first,second}=fixture();
+ first.content='static wrapper';
+ info.structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...first,identifier:'worldInfoBefore'}]},{identifier:'chatHistory',getCollection:()=>[{...second,identifier:'chatHistory-1'}]}]};
+ info.formatWorldInfo=()=> 'static wrapper';
+ assert.equal(buildStructuredProof(capture,info).length,0);
+ assert.equal(confirmStructuredProof([{message:first,role:first.role,name:'',text:first.content,entries:[{key:'["Book",1]',text:'missing\n'}]}],[first,second]).size,0);
+});

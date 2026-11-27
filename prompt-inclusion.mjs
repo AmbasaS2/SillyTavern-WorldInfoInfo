@@ -130,7 +130,14 @@ function validGroup(rows){
     return rows.length>0&&rows.every(row=>isText(row.text)&&row.text.trim()&&Number.isFinite(row.entry.order));
 }
 const refs=rows=>rows.map(row=>({key:key(row.entry),text:row.text+'\n'}));
-function addRows(block,rows){if(block)block.entries.push(...refs(rows));}
+function addRows(block,rows,sourceText){
+    if(!block||!isText(sourceText))return;
+    const normalized=sourceText.replace(/\s+/g,' ').trim();
+    block.entries.push(...refs(rows.filter(row=>{
+        const text=row.text.replace(/\s+/g,' ').trim();
+        return text&&normalized.includes(text);
+    })));
+}
 function outletGroups(capture,trace){
     const groups=new Map();
     for(const row of capture.rows)if(row.outlet&&isText(row.entry.outletName)&&row.entry.outletName){
@@ -220,14 +227,15 @@ function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
     }
     // Check every observed injected slot against the host's actual input and
     // prepared output, before accepting any of the route reconstruction.
-    let observed=0;const verified=[];
+    let observed=0;const verified=[],historyNodes=new Map();
+    for(const node of trace.nodes){if(node.parent!=='chatHistory')continue;const list=historyNodes.get(node.id)??[];list.push(node);historyNodes.set(node.id,list);}
     for(let i=0;i<slots.length;i++){
         const group=slots[i];if(!group)continue;
         const id='chatHistory-'+(total-i),record=trace.history.get(id);
         if(!record){if(total-i>=lowest)return;verified.push({group,node:null});continue;}
         if(record.raw!==group.content||record.role!==group.role||record.content!==group.content)return;
         observed++;
-        const candidates=trace.nodes.filter(n=>n.parent==='chatHistory'&&n.id===id);
+        const candidates=historyNodes.get(id)??[];
         if(candidates.length>1)return;
         const node=candidates[0]??null;
         if(node&&(node.content!==record.content||node.role!==record.role))return;
@@ -236,7 +244,7 @@ function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
     // Without any actual slot observation, do not infer what was dropped.
     if(!observed)return;
     for(const {group,node} of verified){
-        if(node)addRows(aligned.byNode.get(node),group.rows);
+        if(node)addRows(aligned.byNode.get(node),group.rows,node.content);
         else for(const row of group.rows)if(!row.outlet)excluded.set(key(row.entry),'context');
     }
 }
@@ -255,9 +263,11 @@ export function buildTraceEvidence(capture,info,trace){
             if(!Number.isInteger(position))continue;
             const rows=capture.rows.filter(r=>!r.outlet&&r.entry.position===position&&r.text);
             if(!validGroup(rows))continue;
-            const expected=info.formatWorldInfo(orderRows(rows).reverse().map(row=>row.text).join('\n'));
+            const joined=orderRows(rows).reverse().map(row=>row.text).join('\n');
+            const expected=info.formatWorldInfo(joined);
             const candidates=trace.nodes.filter(n=>n.parent===id&&n.id===id);
-            if(candidates.length===1&&candidates[0].content===expected)addRows(aligned.byNode.get(candidates[0]),rows);
+            if(candidates.length===1&&typeof expected==='string'&&expected.includes(joined)&&candidates[0].content===expected)
+                addRows(aligned.byNode.get(candidates[0]),rows,candidates[0].content);
             else if(!candidates.length&&disabled&&!trace.prompts.some(p=>p.id===id&&p.position===1))
                 for(const row of rows)excluded.set(key(row.entry),'preset');
         }
@@ -269,7 +279,7 @@ export function buildTraceEvidence(capture,info,trace){
             const rows=preparedOutlets(p,trace,outlets);
             if(!rows.length)continue;
             const nodes=trace.nodes.filter(n=>n.id===p.id&&n.role===p.role&&n.content===p.content);
-            if(nodes.length===1)addRows(aligned.byNode.get(nodes[0]),rows);
+            if(nodes.length===1)addRows(aligned.byNode.get(nodes[0]),rows,nodes[0].content);
         }
         let noteRows=[];
         if(isText(trace.noteBase)&&Number.isInteger(info.anTopPosition)&&Number.isInteger(info.anBottomPosition)){
@@ -280,7 +290,7 @@ export function buildTraceEvidence(capture,info,trace){
                     noteRows=[...top,...bottom];
                     const p=trace.prompts.find(p=>p.id==='authorsNote'&&p.position!==1&&p.content===expected);
                     const nodes=p?trace.nodes.filter(n=>n.id==='authorsNote'&&n.role===p.role&&n.content===expected):[];
-                    if(nodes.length===1)addRows(aligned.byNode.get(nodes[0]),noteRows);
+                    if(nodes.length===1)addRows(aligned.byNode.get(nodes[0]),noteRows,nodes[0].content);
                 }
             }
         }

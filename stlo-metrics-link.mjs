@@ -99,8 +99,9 @@ export function buildStructuredProof(capture,info){
             if(!group.length||group.some(row=>!Number.isFinite(row.entry.order)||!row.text.trim()))continue;
             // Host sorts descending and unshifts: reversing also handles ties.
             const ordered=group.slice().sort((a,b)=>b.entry.order-a.entry.order).reverse();
-            const exact=info.formatWorldInfo(ordered.map(row=>row.text).join('\n'));
-            if(typeof exact!=='string'||!exact)continue;
+            const joined=ordered.map(row=>row.text).join('\n');
+            const exact=info.formatWorldInfo(joined);
+            if(typeof exact!=='string'||!exact||!exact.includes(joined))continue;
             const indices=flat.map((node,i)=>node.parent===identifier&&node.message.identifier===identifier?i:-1).filter(i=>i>=0);
             if(indices.length!==1)continue;
             const message=info.messages[indices[0]];
@@ -122,7 +123,12 @@ export function confirmStructuredProof(blocks,messages){
         if(messages.filter(m=>m===block.message).length!==1)continue;
         const m=block.message;
         if(m.content!==block.text||m.role!==block.role||(m.name||'')!==block.name)continue;
-        for(const entry of block.entries)proven.set(entry.key,entry.text);
+        if(typeof m.content!=='string')continue;
+        const normalized=m.content.replace(/\s+/g,' ').trim();
+        for(const entry of block.entries){
+            const text=entry.text.replace(/\s+/g,' ').trim();
+            if(text&&normalized.includes(text))proven.set(entry.key,entry.text);
+        }
     }
     return proven;
 }
