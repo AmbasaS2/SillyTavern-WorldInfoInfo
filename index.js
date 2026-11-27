@@ -1621,10 +1621,12 @@ const init = ()=>{
     // Wait for the actual reply to finish (not prompt construction). This
     // single event callback only schedules work when the opt-in list is open.
     const onCompletedGeneration = () => {
-        releaseWorldInfoConsoleCapture();
-        releasePromptTrace();noteBeforeScan=null;
+        // A completion notification from another extension must not release
+        // the current visible reply's scan/assembly capture before it finishes.
         if (!tokenGenerationAwaitingEnd || realGenerationInProgress ||
             finalizedTokenGeneration !== generationSerial) return;
+        releaseWorldInfoConsoleCapture();
+        releasePromptTrace();noteBeforeScan=null;
         tokenGenerationAwaitingEnd = false;
         insight.ready();
         syncTokenFooter();

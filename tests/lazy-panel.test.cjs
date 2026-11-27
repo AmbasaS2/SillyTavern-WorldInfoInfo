@@ -104,3 +104,32 @@ test('unrelated idle generation stop preserves the last verified display and dia
     assert.equal(context.realGenerationInProgress, false);
     assert.equal(calls.length, 14);
 });
+
+
+test('unrelated completion cannot release an in-progress visible reply capture', () => {
+    const calls = [];
+    const context = vm.createContext({
+        realGenerationInProgress: true, tokenGenerationAwaitingEnd: true,
+        generationSerial: 5, finalizedTokenGeneration: -1, noteBeforeScan: 'scan note',
+        releaseWorldInfoConsoleCapture() { calls.push('console'); },
+        releasePromptTrace() { calls.push('trace'); },
+        insight: { ready() { calls.push('ready'); } },
+        syncTokenFooter() { calls.push('footer'); },
+        panel: { classList: { contains: () => false } },
+        scheduleTokenSummary() { calls.push('count'); },
+    });
+    vm.runInContext(extract('    const onCompletedGeneration = () => {',
+        '    eventSource.on(event_types.GENERATION_ENDED, onCompletedGeneration);') +
+        '\nthis.complete = onCompletedGeneration;', context);
+    context.complete();
+    assert.deepEqual(calls, []);
+    assert.equal(context.noteBeforeScan, 'scan note');
+    assert.equal(context.tokenGenerationAwaitingEnd, true);
+    context.realGenerationInProgress = false;
+    context.finalizedTokenGeneration = 5;
+    context.complete();
+    assert.deepEqual(calls, ['console', 'trace', 'ready', 'footer']);
+    assert.equal(context.tokenGenerationAwaitingEnd, false);
+    context.complete();
+    assert.equal(calls.length, 4);
+});
