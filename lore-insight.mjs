@@ -1,4 +1,5 @@
 import { connectStloMetrics, metricsKey, buildStructuredProof, confirmStructuredProof, buildInjectionRecords } from './stlo-metrics-link.mjs';
+import { buildTraceEvidence } from './prompt-inclusion.mjs';
 
 // Lore Insight: bounded, session-only capture from existing visible RP hooks.
 // No AI request, polling, storage, or lorebook reload.
@@ -22,11 +23,12 @@ export function createInsightCapture(serial,chatId,observed,scope=null) {
     let chars=0;
     const capture={
         serial,chatId,observed,scope,rows:[],parts:null,source:'assembled',promptLimited:false,truncated:false,measurement:null,
+        nonactivated:[],nonactivatedLimited:false,proven:new Map(),excluded:new Map(),inspection:null,
         setPrompt(parts,_normalized,source='assembled') {
             capture.source=source;
             capture.parts=boundedParts(parts);
             capture.promptLimited=capture.parts===null;
-            capture.measurement=null;
+            capture.measurement=null;capture.inspection=null;
         },
         add(entry,rendered,outlet=false) {
             if(typeof rendered!=='string')rendered='';
@@ -124,15 +126,24 @@ export function inspectInsight(capture) {
     // Dedicated host blocks establish provenance even if identical text occurs
     // elsewhere. The evidence publisher never uses ordinary substring matches.
     for(const row of rows){
-        const proven=capture.proven?.get(metricsKey(row.entry));
-        row.sourceVerified=typeof proven==='string'&&proven===row.text+'\n';
-        if(row.sourceVerified)row.status='matched';
+        const id=metricsKey(row.entry),proven=capture.proven?.get(id);
+        row.sourceVerified=!capture.promptLimited&&typeof proven==='string'&&proven===row.originalText+'\n';
+        if(row.sourceVerified){row.status='matched';row.text=row.originalText;}
+        else if(capture.excluded?.has(id)){row.status='excluded';row.exclusion=capture.excluded.get(id);}
     }
     return rows;
 }
 
-export function insightReason(entry,ev) {
-    if(entry.stwiiJevRecall===true) return 'jev';
+export function getInsightRows(capture){
+    if(!capture)return [];
+    return capture.inspection??(capture.inspection=inspectInsight(capture));
+}
+export function verifiedInsightRows(capture){
+    return capture?.source==='request'?getInsightRows(capture).filter(row=>row.sourceVerified):[];
+}
+
+export function insightReasonCodes(entry,ev) {
+    if(entry.stwiiJevRecall===true) return ['jev'];
     const reasons=[];
     if(ev?.primary?.trim?.()||['AND_ANY','AND_ALL','NOT_ANY','NOT_ALL'].includes(ev?.logic)) reasons.push('keyword');
     if(ev?.vectorConfirmed===true) reasons.push('vector');
@@ -140,7 +151,11 @@ export function insightReason(entry,ev) {
     if(ev?.logic==='STICKY') reasons.push('sticky');
     if(ev?.logic==='DECORATOR') reasons.push('decorator');
     if(['FORCE_ACTIVATE','EXTERNAL'].includes(ev?.logic)&&!ev?.vectorConfirmed) reasons.push('external');
-    return reasons.length>1?'multiple':reasons[0]??'unknown';
+    return reasons.length?reasons:['unknown'];
+}
+export function insightReason(entry,ev){
+    const reasons=insightReasonCodes(entry,ev);
+    return reasons.length>1?'multiple':reasons[0];
 }
 
 export function canShowInsightWorld(world,admin,handle) {
@@ -181,8 +196,8 @@ export function createInsightTokenCache(count,getScope) {
 }
 
 export async function estimateInsight(rows,capture,countText,stillCurrent,allVisible,previous=null,countEntry=null){
-    const matched=rows.filter(r=>r.status==='matched');
-    const result={total:previous?.total??null,prompt:previous?.prompt??null,limited:matched.length>MAX_MEASURE,failed:false};
+    const matched=rows.filter(r=>r.sourceVerified===true);
+    const result={total:previous?.total??null,prompt:previous?.prompt??null,limited:matched.length>MAX_MEASURE||capture.truncated||capture.promptLimited,failed:false};
     if(!stillCurrent())return null;
     const combined=matched.map(r=>r.text).join('\n');
     if(matched.length&&combined.length<=MAX_CHARS&&!capture.truncated&&!capture.promptLimited){
@@ -203,8 +218,8 @@ export async function estimateInsight(rows,capture,countText,stillCurrent,allVis
     return stillCurrent()?result:null;
 }
 
-export function createLoreInsight({t,countText,getScope,getChatId,getReason,titleFor,isVisible,reasonLabel,watchRequest,getMetricsBridge}){
-    let latest=null,waiting=false,current=null,releaseRequest=null;
+export function createLoreInsight({t,countText,getScope,getChatId,getReason,titleFor,isVisible,reasonLabel,reasonIcons=()=>[],watchRequest,getMetricsBridge}){
+    let latest=null,waiting=false,current=null,releaseRequest=null,finalizeCapture=null;
     const readScope=()=>{try{return getScope();}catch{return null;}};
     function stopWatching(){const release=releaseRequest;releaseRequest=null;try{release?.();}catch{}}
     function beginCapture(serial,chatId,observed){return createInsightCapture(serial,chatId,observed,readScope());}
@@ -214,18 +229,21 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         const {records,complete}=buildInjectionRecords(capture,isVisible,capture.scanComplete);
         capture.stlo.publish(records,complete);
     }
-    function selectionFor(entry){
+    function selectionLabels(entry){
         if(!entry?.stwiiJevRecall||!latest||latest.chatId!==getChatId()||
             readScope()!==latest.scope||!isVisible(entry.world)||
-            !latest.rows.some(row=>row.entry===entry))return '';
+            !latest.rows.some(row=>row.entry===entry))return [];
         const selected=latest.stlo?.selection(entry);
-        if(!selected)return '';
+        if(!selected)return [];
         const labels=[];
-        if(selected.source)labels.push(t('insight.jev.source.'+selected.source));
-        if(selected.score!==null)labels.push(t('insight.jev.score',selected.score.toLocaleString(undefined,{maximumFractionDigits:3})));
-        if(selected.accepted)labels.push(t('insight.jev.accepted'));
-        return labels.join(' · ');
+        if(selected.source){
+            const key='insight.jev.source.'+selected.source;labels.push({key,label:t(key)});
+        }
+        if(selected.score!==null)labels.push({key:'insight.jev.score',label:t('insight.jev.score',selected.score.toLocaleString(undefined,{maximumFractionDigits:3}))});
+        if(selected.accepted)labels.push({key:'insight.jev.accepted',label:t('insight.jev.accepted')});
+        return labels;
     }
+    function selectionFor(entry){return selectionLabels(entry).map(item=>item.label).join(' · ');}
     function invalidate(view){
         if(!view)return;
         view.revision++;
@@ -239,39 +257,52 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
     function refresh(){
         if(current){try{render(current);}catch{close();}}
     }
-    function clear(){stopWatching();close();latest=null;waiting=false;}
-    function start(){stopWatching();latest=null;waiting=true;refresh();}
-    function finish(capture,complete,requestInfo){
-        if(!capture||capture.chatId!==getChatId())return;
-        if(capture.observed===null&&!complete)return;
-        latest=capture;waiting=false;
+    function clear(){stopWatching();finalizeCapture=null;close();latest=null;waiting=false;}
+    function start(){stopWatching();finalizeCapture=null;latest=null;waiting=true;refresh();}
+    function accept(capture){
+        if(latest!==capture||capture.chatId!==getChatId())return;
+        waiting=false;capture.inspection=null;
+        const callback=finalizeCapture;finalizeCapture=null;
+        try{callback?.(capture);}catch{}
+        publish(capture);refresh();
+    }
+    function finish(capture,complete,requestInfo,onFinalized){
+        stopWatching();finalizeCapture=null;
+        if(!capture||capture.chatId!==getChatId()){waiting=false;refresh();return;}
+        latest=capture;waiting=true;finalizeCapture=onFinalized;
         capture.scanComplete=complete;
         capture.stlo=connectStloMetrics(getMetricsBridge);
-        stopWatching();
+        if(capture.observed===null&&!complete){accept(capture);return;}
         if(requestInfo&&typeof watchRequest==='function'){
             const matches=createRequestMatcher(requestInfo.messages,requestInfo.type);
-            const structural=capture.stlo?buildStructuredProof(capture,requestInfo):[];
+            const traced=buildTraceEvidence(capture,requestInfo,requestInfo.trace);
+            const fallback=buildStructuredProof(capture,requestInfo);
+            const structural=[...traced.blocks,...fallback];
+            const assembled=Array.isArray(requestInfo.messages)&&requestInfo.messages.length<=4096?
+                requestInfo.messages.map(message=>({message,content:message?.content,role:message?.role,name:message?.name||''})):null;
             try{
                 releaseRequest=watchRequest(data=>{
-                    if(latest!==capture||capture.chatId!==getChatId())return;
+                    if(latest!==capture||capture.chatId!==getChatId()||!matches(data))return;
                     try{
-                        if(!matches(data))return;
                         capture.setPrompt(requestTextParts(data.messages),null,'request');
                         capture.scope=readScope();
-                        capture.proven=confirmStructuredProof(structural,data.messages);
-                        stopWatching();
-                        publish(capture);refresh();
-                    }catch{stopWatching();}
+                        if(!capture.promptLimited){
+                            capture.proven=confirmStructuredProof(structural,data.messages);
+                            const unchanged=assembled&&data.messages.length===assembled.length&&assembled.every((item,i)=>
+                                data.messages[i]===item.message&&item.message.content===item.content&&item.message.role===item.role&&(item.message.name||'')===item.name);
+                            capture.excluded=unchanged?traced.excluded:new Map();
+                        }
+                    }catch{}
+                    stopWatching();accept(capture);
                 });
+                if(typeof releaseRequest==='function'){refresh();return;}
             }catch{stopWatching();}
         }
-        // Publish immediately after prompt assembly, not after the reply.
-        refresh();
+        accept(capture);
     }
     function ready(){
         stopWatching();
-        if(waiting){waiting=false;refresh();}
-        // Do not reopen, repaint, or restart an in-flight count at completion.
+        if(waiting){if(latest)accept(latest);else{waiting=false;refresh();}}
     }
     function element(tag,cls,text){
         const node=document.createElement(tag);
