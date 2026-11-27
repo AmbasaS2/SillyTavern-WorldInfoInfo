@@ -1385,7 +1385,8 @@ const init = ()=>{
             !panel.classList.contains('stwii--isActive') ||
             realGenerationInProgress || tokenGenerationAwaitingEnd ||
             finalizedTokenGeneration !== generationSerial ||
-            tokenSummary?.serial === generationSerial || tokenSummaryPending === generationSerial) return;
+            (tokenSummary?.serial === generationSerial && Number.isFinite(tokenSummary.count)) ||
+            tokenSummaryPending === generationSerial) return;
 
         const serial = generationSerial;
         const chatId = getCurrentChatId();

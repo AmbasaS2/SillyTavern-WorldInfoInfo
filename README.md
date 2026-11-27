@@ -30,7 +30,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.14.**
+**Current version: 1.7.1-ambasa.19.**
 
 .14 fixes missing verified entries caused by concurrent prompt assemblies, sparse preset slots and complex depth/outlet routing. The book still lists only verified insertions; Lore Insight shows verified insertions and verified omissions from the activation list.
 
@@ -306,7 +306,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.14.**
+**현재 버전: 1.7.1-ambasa.19.**
 
 .14에서는 동시 프롬프트 조립, 빈 프리셋 슬롯, 복합 깊이·아웃렛 경로에서 실제 주입 항목이 누락되던 문제를 수정했어요. 책에는 실제 주입 확인 항목만 표시하고, 로어 인사이트에는 주입 확인 목록과 발동 후 미주입 확인 목록이 있습니다.
 
