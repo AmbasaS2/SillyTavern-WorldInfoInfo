@@ -51,3 +51,47 @@ test('both popups remain completely visible near bottom of a small viewport', ()
     assert.equal(settings.top,'197px');
     assert.equal(settings['max-height'],'350px');
 });
+
+test('destroy releases all global gesture handlers and cancels a pending long press', () => {
+    const registrations = extract("    trigger.addEventListener('pointerdown', onLongPressPointerDown);", '    // Prevent click toggle');
+    const cleanup = extract('    // Release global gesture handlers before removing their trigger.', '    try {\n        const t = window.STWII.trigger;');
+    const listeners = new Map();
+    const window = {
+        addEventListener(type, handler) {
+            const set = listeners.get(type) || new Set();
+            set.add(handler);
+            listeners.set(type, set);
+        },
+        removeEventListener(type, handler) { listeners.get(type)?.delete(handler); },
+    };
+    const cancelled = [];
+    const ctx = vm.createContext({
+        window,
+        trigger: { addEventListener() {} },
+        onLongPressPointerDown() {},
+        onPointerDown() {},
+        onLongPressPointerMove() {},
+        onPointerMove() {},
+        endDrag() {},
+        longPressTimer: 7,
+        longPressPointerId: 2,
+        dragging: true,
+        movedEnough: true,
+        cancelled,
+        clearTimeout(id) { cancelled.push(id); },
+    });
+    // Use the actual production timer cleanup rather than a no-op stub.
+    vm.runInContext(extract('    function clearLongPress() {', '    function onLongPressPointerDown(e) {'), ctx);
+    vm.runInContext(registrations, ctx);
+    assert.equal([...listeners.values()].reduce((n, set) => n + set.size, 0), 6);
+    vm.runInContext(cleanup, ctx);
+    assert.equal([...listeners.values()].reduce((n, set) => n + set.size, 0), 0);
+    assert.deepEqual(cancelled, [7]);
+    assert.equal(ctx.longPressTimer, null);
+    assert.equal(ctx.longPressPointerId, null);
+    assert.equal(ctx.dragging, false);
+    assert.equal(ctx.movedEnough, false);
+    // A fresh initialization must have one copy of each handler.
+    vm.runInContext(registrations, ctx);
+    assert.equal([...listeners.values()].reduce((n, set) => n + set.size, 0), 6);
+});
