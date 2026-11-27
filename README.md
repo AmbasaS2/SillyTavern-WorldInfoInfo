@@ -231,7 +231,7 @@ WorldInfo Info does not decide what lore should be activated or injected. The co
 
 Compatible STLO marks actual Jev activation without a second request. Compatible Lorebook Manager reads saved translations and optionally opens the exact entry by book name and UID. Memory Books is not required to inspect Jev or any other lore.
 
-[Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+[Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Sloth the Lorebook Manager / 로어북 매니저: 게으름뱅이](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
 
 The detailed sections below explain optional settings. Compatibility is version-dependent; it does not guarantee every third-party extension or device.
 
@@ -249,7 +249,7 @@ WorldInfo Info uses STLO's existing selection and the final World Info activatio
 
 <a id="-월드인포인포"></a>
 
-# 📚 나무늘보의 월드인포인포
+# 📚 게으름뱅이가 읽는 월드인포인포
 
 **이번 RP에 어떤 로어가 불러와졌는지 채팅 화면에서 바로 확인하는 확장입니다.** 로어를 새로 만들거나 주입 여부를 결정하는 확장이 아닙니다.
 
@@ -400,7 +400,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 호환 STLO의 실제 Jev 결과를 추가 요청 없이 표시합니다. 호환 로어북 매니저의 저장 번역을 읽거나 책 이름과 UID로 정확한 서재 항목을 엽니다. 메모리북은 Jev 표시나 일반 로어 확인에 필수가 아닙니다.
 
-[Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Sloth the Lorebook Manager / 로어북 매니저 나무늘보씨](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
+[Lorebook Ordering for Sloths](https://github.com/AmbasaS2/SillyTavern-LorebookOrdering) · [Sloth the Lorebook Manager / 로어북 매니저: 게으름뱅이](https://github.com/AmbasaS2/lore-manager) · [Sloth's Memory Books / 게으름뱅이의 메모리북](https://github.com/AmbasaS2/SillyTavern-MemoryBooks)
 
 아래에서 필요한 설정만 자세히 읽으세요. 지원 버전 기준이며 모든 기기·다른 확장 조합을 보장하는 것은 아닙니다.
 
