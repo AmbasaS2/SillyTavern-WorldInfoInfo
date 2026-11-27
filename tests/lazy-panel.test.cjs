@@ -133,3 +133,24 @@ test('unrelated completion cannot release an in-progress visible reply capture',
     context.complete();
     assert.equal(calls.length, 4);
 });
+
+test('console capture checks source stacks only for potential World Info messages and restores methods',()=>{
+ const received=[],captures=[];let stackReads=0,caller='https://host/other.js:5';
+ const fakeConsole={log(...args){received.push(args);},debug(...args){received.push(args);}};
+ const originalLog=fakeConsole.log,originalDebug=fakeConsole.debug;
+ const ctx=vm.createContext({console:fakeConsole,realGenerationInProgress:true,stopConsoleCapture:null,
+   worldInfoLogSources:['https://host/world-info.js'],
+   Error:class {get stack(){stackReads++;return 'Error\n    at captureWorldInfoConsole (extension.js:1)\n    at '+caller;}},
+   captureDebug(fn,...args){captures.push(args);return fn.apply(fakeConsole,args);},
+   captureLog(fn,...args){captures.push(args);return fn.apply(fakeConsole,args);},
+   releaseWorldInfoConsoleCapture(){ctx.stopConsoleCapture?.();ctx.stopConsoleCapture=null;}
+ });
+ vm.runInContext(extract('    function startWorldInfoConsoleCapture()', '// Optional teardown')+'\nthis.start=startWorldInfoConsoleCapture;',ctx);
+ ctx.start();fakeConsole.log('ordinary log');fakeConsole.debug({arbitrary:true});
+ assert.equal(stackReads,0);
+ fakeConsole.log('[WI] fake source');assert.equal(stackReads,1);assert.equal(captures.length,0);
+ caller='https://host/world-info.js:19';
+ fakeConsole.debug('[WI] real source');assert.equal(stackReads,2);assert.equal(captures.length,1);
+ assert.equal(received.length,4);
+ ctx.releaseWorldInfoConsoleCapture();assert.equal(fakeConsole.log,originalLog);assert.equal(fakeConsole.debug,originalDebug);
+});

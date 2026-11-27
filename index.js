@@ -2428,31 +2428,31 @@ function endBuildSession() {
 
     function startWorldInfoConsoleCapture() {
         releaseWorldInfoConsoleCapture();
-        // Exact activation reasons are only available in the engine's diagnostics.
-        // Return the original function at every unrelated call site so DevTools
-        // records the caller itself, rather than a forwarding wrapper.
+        // Only likely World Info diagnostics need a source check. Ordinary
+        // console calls are forwarded immediately without allocating Error.stack.
         const restore = [];
         for (const [method, collect] of [['debug', captureDebug], ['log', captureLog]]) {
             const descriptor = Object.getOwnPropertyDescriptor(console, method);
             if (!descriptor?.configurable || !descriptor.writable || typeof descriptor.value !== 'function') continue;
-            const capture = (...args) => collect(descriptor.value, ...args);
-            const getWorldInfoConsoleMethod = function getWorldInfoConsoleMethod() {
-                const frames = (new Error().stack ?? '').split('\n', 4);
-                const callerIndex = frames.findIndex(frame => frame.includes('getWorldInfoConsoleMethod')) + 1;
-                const caller = callerIndex > 0 ? frames[callerIndex] ?? '' : '';
-                return worldInfoLogSources.some(source => caller.includes(source + ':') || caller.includes(source + '?'))
-                    ? capture : descriptor.value;
+            const capture = function captureWorldInfoConsole(...args) {
+                const first = args[0];
+                if (realGenerationInProgress && typeof first === 'string' && (
+                    first.includes('[WI]') || first.includes('--- BUILDING PROMPT ---')
+                    || first.includes('--- DONE ---') || first.startsWith('Vectors: Activated ')
+                    || /^WI entry \d+ failed probability check, removing from activated entries$/.test(first)
+                )) {
+                    const frames = (new Error().stack ?? '').split('\n', 4);
+                    const callerIndex = frames.findIndex(frame => frame.includes('captureWorldInfoConsole')) + 1;
+                    const caller = callerIndex > 0 ? frames[callerIndex] ?? '' : '';
+                    if (worldInfoLogSources.some(source => caller.includes(source + ':') || caller.includes(source + '?'))) {
+                        return collect(descriptor.value, ...args);
+                    }
+                }
+                return descriptor.value.apply(console, args);
             };
-            Object.defineProperty(console, method, {
-                configurable: true,
-                enumerable: descriptor.enumerable,
-                get: getWorldInfoConsoleMethod,
-                set(value) {
-                    Object.defineProperty(console, method, { ...descriptor, value });
-                },
-            });
+            Object.defineProperty(console, method, { ...descriptor, value: capture });
             restore.push(() => {
-                if (Object.getOwnPropertyDescriptor(console, method)?.get === getWorldInfoConsoleMethod) {
+                if (Object.getOwnPropertyDescriptor(console, method)?.value === capture) {
                     Object.defineProperty(console, method, descriptor);
                 }
             });
