@@ -26,11 +26,11 @@ export function createInsightCapture(serial,chatId,observed,scope=null) {
             capture.promptLimited=capture.parts===null;
             capture.measurement=null;
         },
-        add(entry,rendered) {
+        add(entry,rendered,outlet=false) {
             if(typeof rendered!=='string')rendered='';
             if(capture.rows.length>=MAX_ROWS||chars+rendered.length>MAX_CHARS){capture.truncated=true;return;}
             chars+=rendered.length;
-            capture.rows.push({entry,text:rendered});
+            capture.rows.push({entry,text:rendered,outlet});
         },
     };
     return capture;
@@ -77,19 +77,11 @@ export function requestTextParts(messages) {
     return parts;
 }
 
-// Do not manufacture matches across message boundaries or double-count overlaps.
+// Match within a message; duplicate or overlapping strings are ambiguous.
+// For outlets only, try the exact captured raw body if rendered text is absent.
 export function inspectInsight(capture) {
     const rows=[],spans=[],ids=new Map(),parts=(capture.parts??[]).map(normalize).filter(Boolean);
-    for(const {entry,text} of capture.rows){
-        const id=JSON.stringify([entry.world,entry.uid]);
-        if(ids.has(id)){
-            const existing=ids.get(id);
-            if(existing.text!==text)existing.status='ambiguous';
-            continue;
-        }
-        const needle=normalize(text),row={entry,text,status:'unknown',tokens:null};
-        ids.set(id,row);rows.push(row);
-        if(!parts.length||!needle)continue;
+    function locate(needle,row){
         let hits=0;
         for(let partIndex=0;partIndex<parts.length;partIndex++){
             const part=parts[partIndex],start=part.indexOf(needle);
@@ -98,6 +90,26 @@ export function inspectInsight(capture) {
             const again=part.indexOf(needle,start+1);
             if(again>=0){hits++;spans.push({partIndex,start:again,end:again+needle.length,row});}
             if(hits>=2)break;
+        }
+        return hits;
+    }
+    for(const {entry,text,outlet=false} of capture.rows){
+        const id=JSON.stringify([entry.world,entry.uid]);
+        if(ids.has(id)){
+            const existing=ids.get(id);
+            if(existing.originalText!==text)existing.status='ambiguous';
+            continue;
+        }
+        const needle=normalize(text),row={entry,text,originalText:text,outlet,status:'unknown',tokens:null};
+        ids.set(id,row);rows.push(row);
+        if(!parts.length||!needle)continue;
+        let hits=locate(needle,row);
+        if(!hits&&outlet&&typeof entry.content==='string'){
+            const raw=entry.content.trim(),rawNeedle=normalize(raw);
+            if(rawNeedle&&rawNeedle!==needle){
+                hits=locate(rawNeedle,row);
+                if(hits)row.text=raw;
+            }
         }
         row.status=hits===0?'unmatched':hits===1?'matched':'ambiguous';
     }
@@ -183,36 +195,52 @@ export async function estimateInsight(rows,capture,countText,stillCurrent,allVis
 }
 
 export function createLoreInsight({t,countText,getScope,getChatId,getReason,titleFor,isVisible,reasonLabel,watchRequest}){
-    let latest=null,available=false,waiting=false,current=null,releaseRequest=null;
+    let latest=null,waiting=false,current=null,releaseRequest=null;
     const readScope=()=>{try{return getScope();}catch{return null;}};
     function stopWatching(){const release=releaseRequest;releaseRequest=null;try{release?.();}catch{}}
     function beginCapture(serial,chatId,observed){return createInsightCapture(serial,chatId,observed,readScope());}
+    function invalidate(view){
+        if(!view)return;
+        view.revision++;
+        if(view.timer!==null){clearTimeout(view.timer);view.timer=null;}
+    }
     function close(){
         const old=current;if(!old)return;
-        current=null;old.overlay.close();old.overlay.remove();
+        current=null;invalidate(old);old.overlay.close();old.overlay.remove();
         if(old.previousFocus?.isConnected)old.previousFocus.focus?.();
     }
-    function clear(){stopWatching();close();latest=null;available=false;waiting=false;}
-    function start(){clear();waiting=true;}
+    function refresh(){
+        if(current){try{render(current);}catch{close();}}
+    }
+    function clear(){stopWatching();close();latest=null;waiting=false;}
+    function start(){stopWatching();latest=null;waiting=true;refresh();}
     function finish(capture,complete,requestInfo){
         if(!capture||capture.chatId!==getChatId())return;
         if(capture.observed===null&&!complete)return;
-        latest=capture;
-        if(!requestInfo||typeof watchRequest!=='function')return;
-        const matches=createRequestMatcher(requestInfo.messages,requestInfo.type);
-        try{
-            releaseRequest=watchRequest(data=>{
-                if(!waiting||latest!==capture||capture.chatId!==getChatId())return;
-                try{
-                    if(!matches(data))return;
-                    capture.setPrompt(requestTextParts(data.messages),null,'request');
-                    capture.scope=readScope();
-                    stopWatching();
-                }catch{stopWatching();}
-            });
-        }catch{stopWatching();}
+        latest=capture;waiting=false;
+        stopWatching();
+        if(requestInfo&&typeof watchRequest==='function'){
+            const matches=createRequestMatcher(requestInfo.messages,requestInfo.type);
+            try{
+                releaseRequest=watchRequest(data=>{
+                    if(latest!==capture||capture.chatId!==getChatId())return;
+                    try{
+                        if(!matches(data))return;
+                        capture.setPrompt(requestTextParts(data.messages),null,'request');
+                        capture.scope=readScope();
+                        stopWatching();refresh();
+                    }catch{stopWatching();}
+                });
+            }catch{stopWatching();}
+        }
+        // Publish immediately after prompt assembly, not after the reply.
+        refresh();
     }
-    function ready(){stopWatching();waiting=false;available=!!latest;if(current){try{open();}catch{close();}}}
+    function ready(){
+        stopWatching();
+        if(waiting){waiting=false;refresh();}
+        // Do not reopen, repaint, or restart an in-flight count at completion.
+    }
     function element(tag,cls,text){
         const node=document.createElement(tag);
         if(cls)node.className=cls;
@@ -231,104 +259,140 @@ export function createLoreInsight({t,countText,getScope,getChatId,getReason,titl
         const x=element('button','stwii--reader-close','×');x.type='button';x.setAttribute('aria-label',t('reader.close'));
         header.append(title,x);
         const body=element('div','stwii--insight-body');
-        dialog.append(header,body);overlay.append(dialog);current={overlay,previousFocus};
+        dialog.append(header,body);overlay.append(dialog);
+        current={overlay,previousFocus,body,revision:0,timer:null};
         x.addEventListener('click',close);
         overlay.addEventListener('cancel',e=>{e.preventDefault();close();});
         overlay.addEventListener('click',e=>{if(e.target===overlay)close();});
         document.body.append(overlay);overlay.showModal();x.focus();
-        if(waiting||!available||!latest||latest.chatId!==getChatId()){
+        render(current);
+    }
+    function render(view){
+        invalidate(view);
+        const revision=view.revision,body=view.body;
+        const expanded=new Set([...body.querySelectorAll('details[open]')].map(d=>d.dataset.insightSection));
+        body.replaceChildren();
+        if(waiting||!latest||latest.chatId!==getChatId()){
             body.append(element('p','stwii--insight-note',t(waiting?'insight.waiting':'insight.empty')));return;
         }
-        const capture=latest,view=current,scope=readScope();
+        const capture=latest,scope=readScope();
         const allRows=inspectInsight(capture),rows=allRows.filter(r=>isVisible(r.entry.world));
         const allVisible=rows.length===allRows.length,sameScope=scope!==null&&capture.scope===scope;
+        const matched=rows.filter(r=>r.status==='matched'),unresolved=rows.filter(r=>r.status!=='matched');
         const visibility=JSON.stringify(rows.map(r=>[r.entry.world,r.entry.uid]));
         const saved=sameScope&&capture.measurement?.scope===scope&&capture.measurement?.visibility===visibility?capture.measurement:null;
         for(const row of rows){
             row.reason=getReason(row.entry);
             row.tokens=saved?.tokens.get(JSON.stringify([row.entry.world,row.entry.uid]))??null;
         }
-        const tokenButton=element('button','menu_button stwii--insight-measure',t('insight.measure'));
-        tokenButton.type='button';
         let measurement=saved?.result??null,busy=false;
         const report=element('div','stwii--insight-report');
-        body.append(element('div','stwii--insight-source',t('insight.source.'+capture.source)),element('p','stwii--insight-note',t('insight.note')),tokenButton,report);
+        const status=element('div','stwii--insight-status');status.setAttribute('aria-live','polite');
+        const hint=element('details','stwii--insight-help');
+        hint.dataset.insightSection='help';hint.open=expanded.has('help');
+        hint.append(element('summary','',t('insight.help')),
+            element('p','stwii--insight-note',t('insight.source.'+capture.source)),
+            element('p','stwii--insight-note',t('insight.note')));
+        body.append(report,status,hint);
         if(!sameScope)body.append(element('p','stwii--insight-note',t('insight.scopeChanged')));
         function card(label,value){
             const node=element('div','stwii--insight-card');
             node.append(element('small','',label),element('strong','',value));return node;
         }
+        function bar(fraction){
+            const track=element('div','stwii--insight-bar');track.setAttribute('aria-hidden','true');
+            const fill=element('div','stwii--insight-bar-fill');
+            fill.style.width=(100*Math.min(1,Math.max(0,fraction))).toFixed(2)+'%';
+            track.append(fill);return track;
+        }
         function groupSection(label,key,display){
             const section=element('section','stwii--insight-section');
             section.append(element('h4','',label));
-            const groups=new Map();
-            for(const row of rows){
+            const groups=new Map(),allMeasured=matched.length>0&&matched.every(r=>validCount(r.tokens));
+            const sum=allMeasured?matched.reduce((n,r)=>n+r.tokens,0):0;
+            for(const row of matched){
                 const k=key(row);
-                if(!groups.has(k))groups.set(k,{count:0,matched:0,measured:0,tokens:0});
+                if(!groups.has(k))groups.set(k,{count:0,measured:0,tokens:0});
                 const g=groups.get(k);g.count++;
-                if(row.status==='matched'){
-                    g.matched++;if(validCount(row.tokens)){g.tokens+=row.tokens;g.measured++;}
-                }
+                if(validCount(row.tokens)){g.tokens+=row.tokens;g.measured++;}
             }
             for(const [k,g] of groups){
-                const value=g.matched===0?'—':g.matched===g.measured?formatted(g.tokens):t('insight.unmeasured');
+                const value=g.count===g.measured?formatted(g.tokens):t('insight.unmeasured');
                 const line=element('div','stwii--insight-line');
-                line.append(element('span','',display(k)),element('small','',g.matched+' / '+g.count),element('strong','',value));
+                line.append(element('span','',display(k)),element('small','',t('insight.count',g.count)),element('strong','',value));
                 section.append(line);
+                if(sum>0)section.append(bar(g.tokens/sum));
             }
+            if(!groups.size)section.append(element('p','stwii--insight-note',t('insight.noMatches')));
             return section;
         }
-        function paint(){
-            const expanded=report.querySelector('details')?.open??false;
-            report.replaceChildren();
-            const grid=element('div','stwii--insight-grid');
-            const matched=rows.filter(r=>r.status==='matched').length;
-            grid.append(card(t('insight.activated'),String(rows.length)+(capture.truncated?'+':'')),
-                card(t('insight.matched'),String(matched)),card(t('insight.unresolved'),String(rows.length-matched)),
-                card(t('insight.total'),formatted(measurement?.total)));
-            report.append(grid);
-            const ratio=measurement?.prompt>0&&validCount(measurement.total)&&measurement.total<=measurement.prompt
-                ?'~'+(100*measurement.total/measurement.prompt).toFixed(1)+'%':t('insight.unmeasured');
-            report.append(card(t('insight.share'),ratio));
-            if(!allVisible)report.append(element('p','stwii--insight-note',t('insight.visible')));
-            if(capture.truncated||capture.promptLimited||measurement?.limited)report.append(element('p','stwii--insight-note',t('insight.limit')));
-            report.append(groupSection(t('insight.books'),r=>String(r.entry.world??''),s=>s),
-                groupSection(t('insight.reasons'),r=>r.reason,reasonLabel));
+        function entrySection(label,key,list,verified,opened){
             const detail=element('details','stwii--insight-section stwii--insight-details');
-            detail.open=expanded;
-            detail.append(element('summary','',t('insight.entries')+' · '+rows.length));
-            for(const row of rows){
+            detail.dataset.insightSection=key;detail.open=opened.has(key);
+            detail.append(element('summary','',t(label)+' · '+list.length));
+            for(const row of list){
                 const line=element('div','stwii--insight-entry');
                 let name=String(row.entry.uid??'');try{name=titleFor(row.entry)||name;}catch{}
-                line.append(element('strong','',name),
-                    element('small','',String(row.entry.world??'')+' · '+reasonLabel(row.reason)+' · '+t('insight.'+row.status)),
-                    element('span','',formatted(row.tokens)));
+                const meta=[String(row.entry.world??''),reasonLabel(row.reason)];
+                if(row.outlet)meta.push(t('reader.route.outlet')+(row.entry.outletName?' · '+String(row.entry.outletName):''));
+                if(!verified)meta.push(t('insight.'+row.status));
+                line.append(element('strong','',name),element('small','',meta.join(' · ')));
+                if(verified)line.append(element('span','',formatted(row.tokens)));
                 detail.append(line);
             }
-            report.append(detail);
+            return detail;
         }
-        function updateButton(){
-            const hasMatch=rows.some(r=>r.status==='matched'),complete=measurement&&!measurement.failed;
-            tokenButton.disabled=busy||!sameScope||!hasMatch||!!complete;
-            tokenButton.textContent=t(busy?'insight.counting':complete?'insight.measured':measurement?.failed?'insight.retry':'insight.measure');
+        function paint(){
+            const opened=new Set([...report.querySelectorAll('details[open]')].map(d=>d.dataset.insightSection));
+            if(!report.childElementCount)for(const key of expanded)opened.add(key);
+            report.replaceChildren();
+            const grid=element('div','stwii--insight-grid');
+            grid.append(card(t('insight.matched'),t('insight.count',matched.length)),card(t('insight.total'),formatted(measurement?.total)));
+            report.append(grid);
+            const ratio=measurement?.prompt>0&&validCount(measurement.total)&&measurement.total<=measurement.prompt?measurement.total/measurement.prompt:null;
+            const ratioCard=card(t('insight.share'),ratio===null?t('insight.unmeasured'):'~'+(100*ratio).toFixed(1)+'%');
+            if(ratio!==null)ratioCard.append(bar(ratio));
+            report.append(ratioCard);
+            if(!allVisible)report.append(element('p','stwii--insight-note',t('insight.visible')));
+            if(capture.truncated||capture.promptLimited||measurement?.limited)report.append(element('p','stwii--insight-note',t('insight.limit')));
+            report.append(groupSection(t('insight.books'),r=>String(r.entry.world??''),s=>s),groupSection(t('insight.reasons'),r=>r.reason,reasonLabel));
+            report.append(entrySection('insight.entries','matched',matched,true,opened));
+            if(unresolved.length)report.append(entrySection('insight.unresolved','unresolved',unresolved,false,opened));
         }
-        paint();updateButton();
-        tokenButton.addEventListener('click',async()=>{
-            if(busy||!sameScope||!rows.some(r=>r.status==='matched'))return;
-            busy=true;updateButton();
-            const stillCurrent=()=>current===view&&latest===capture&&getChatId()===capture.chatId&&!waiting&&readScope()===scope;
+        const sameView=()=>current===view&&view.revision===revision&&latest===capture&&getChatId()===capture.chatId;
+        const stillCurrent=()=>sameView()&&readScope()===scope;
+        function updateStatus(){
+            status.replaceChildren();
+            if(busy){status.append(element('small','stwii--insight-note',t('insight.counting')));return;}
+            if(measurement?.failed&&sameScope&&stillCurrent()){
+                const retry=element('button','menu_button stwii--insight-measure',t('insight.retry'));retry.type='button';
+                retry.addEventListener('click',calculate);status.append(retry);
+            }
+        }
+        async function calculate(){
+            if(busy||!sameScope||!stillCurrent()||!matched.length||(measurement&&!measurement.failed))return;
+            busy=true;updateStatus();
             try{
                 const result=await estimateInsight(rows,capture,countText,stillCurrent,allVisible,measurement);
                 if(result&&stillCurrent()){
                     measurement=result;
                     capture.measurement={scope,visibility,result,tokens:new Map(rows.map(r=>[JSON.stringify([r.entry.world,r.entry.uid]),r.tokens]))};
-                }else if(current===view){
-                    measurement=null;capture.measurement=null;for(const row of rows)row.tokens=null;
+                }else if(stillCurrent()){
+                    measurement=null;for(const row of rows)row.tokens=null;
                 }
             }catch{
-                if(current===view){measurement={total:null,prompt:null,failed:true};for(const row of rows)row.tokens=null;}
-            }finally{if(current===view){busy=false;updateButton();paint();}}
-        });
+                if(stillCurrent()){measurement={total:null,prompt:null,failed:true};for(const row of rows)row.tokens=null;}
+            }finally{
+                if(stillCurrent()){busy=false;updateStatus();paint();}
+                else if(sameView())refresh();
+            }
+        }
+        paint();updateStatus();
+        // Opening is the opt-in. One deferred job; no watcher or polling.
+        // Prompt dispatch never awaits the token estimate.
+        if(sameScope&&matched.length&&!measurement){
+            view.timer=setTimeout(()=>{view.timer=null;void calculate();},0);
+        }
     }
     return {start,clear,ready,close,open,finish,beginCapture};
 }
