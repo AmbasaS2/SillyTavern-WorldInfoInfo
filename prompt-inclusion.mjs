@@ -8,7 +8,7 @@ const squashExcluded=new Set(['newMainChat','newChat','groupNudge']);
 const isText=x=>typeof x==='string';
 const positive=x=>Number.isInteger(x)&&x>=0;
 const historyIndex=id=>/^chatHistory-(\d+)$/.exec(id??'')?.[1];
-function flatMessages(root){
+function flatMessages(root,readReceipt=null){
     const items=root?.getCollection?.();
     if(!Array.isArray(items)||items.length>LIMIT)return null;
     const out=[];let chars=0;
@@ -21,7 +21,7 @@ function flatMessages(root){
             const content=message.content;
             if((chars+=(content?.length??0))>TRACE_CHARS)return null;
             out.push({parent:nested?item.identifier:null,id:message.identifier,role:message.role,
-                name:message.name||'',content,tools:!!message.tool_calls});
+                name:message.name||'',content,tools:!!message.tool_calls,receipt:readReceipt?.(message)??null});
         }
     }
     return out;
@@ -42,66 +42,120 @@ function extensionSnapshot(value){
 
 // Capture the pre-squash message hierarchy (native PromptManager discards
 // identifiers during squashing), and the actual prepared in-chat prompts.
-export function observePromptAssembly(manager,readExtensions,type,noteBase=null){
+export function observePromptAssembly(manager,readExtensions,type,noteBase=null,messageClass=null){
     if(!manager||!['getPromptCollection','preparePrompt','setChatCompletion'].every(k=>typeof manager[k]==='function'))return null;
-    const restorers=[];let active=true,collection=null,prepared=new WeakMap(),history=new Map(),chars=0,limited=false,latest=null;
-    function wrap(name,after,before){
-        const own=Object.getOwnPropertyDescriptor(manager,name),original=manager[name];
-        if(own&&!own.configurable)throw Error('Unsupported prompt manager');
-        const wrapped=function(...args){
-            if(active&&this===manager&&before)try{before(args);}catch{limited=true;}
-            const result=original.apply(this,args);
-            if(active&&this===manager)try{after(args,result);}catch{limited=true;latest=null;}
-            return result;
-        };
-        Object.defineProperty(manager,name,{value:wrapped,configurable:true,writable:true,enumerable:own?.enumerable??false});
+    const restorers=[],native=typeof messageClass?.fromPromptAsync==='function';
+    let active=true,collections=[],prepared=new WeakMap(),receipts=new WeakMap(),requests=new WeakMap(),
+        legacyHistory=new Map(),latest=null,chars=0,records=0;
+    function install(target,name,factory){
+        const own=Object.getOwnPropertyDescriptor(target,name),original=target[name];
+        if(typeof original!=='function'||own&&!own.configurable)throw Error('Unsupported prompt observer');
+        const wrapped=factory(original);
+        Object.defineProperty(target,name,{value:wrapped,configurable:true,writable:true,enumerable:own?.enumerable??false});
         restorers.push(()=>{
-            if(manager[name]!==wrapped)return;
-            if(own)Object.defineProperty(manager,name,own);else delete manager[name];
+            if(target[name]!==wrapped)return;
+            if(own)Object.defineProperty(target,name,own);else delete target[name];
         });
     }
-    function release(){active=false;for(const restore of restorers.reverse())try{restore();}catch{}restorers.length=0;collection=null;prepared=new WeakMap();history.clear();}
+    function wrap(name,after){
+        install(manager,name,original=>function(...args){
+            const result=original.apply(this,args);
+            if(active&&this===manager)try{after(args,result);}catch{}
+            return result;
+        });
+    }
+    function release(){
+        active=false;
+        for(const restore of restorers.reverse())try{restore();}catch{}
+        restorers.length=0;collections=[];prepared=new WeakMap();receipts=new WeakMap();requests=new WeakMap();legacyHistory.clear();latest=null;
+    }
     try{
+        // Native history IDs are local to an assembly. A concurrent dry-run
+        // may reuse every one of them. Bind a prepared prompt to the actual
+        // Message object created from it, not to its string identifier.
+        if(native)install(messageClass,'fromPromptAsync',original=>function(...args){
+            const prompt=args[0],record=prepared.get(prompt),result=original.apply(this,args);
+            if(active&&prompt&&result&&typeof result.then==='function'){
+                result.then(message=>{
+                    if(active&&message&&typeof message==='object')receipts.set(message,{prompt,record});
+                },()=>{});
+            }
+            return result;
+        });
         wrap('getPromptCollection',(args,result)=>{
-            if(args[0]===type)collection=result;
-        },args=>{
-            if(args[0]===type){collection=null;prepared=new WeakMap();history=new Map();chars=0;limited=false;latest=null;}
+            if(!result)return;
+            if(!native){if(args[0]!==type)return;collections=[];legacyHistory.clear();}
+            collections.push({type:args[0],collection:result,extensions:extensionSnapshot(readExtensions()),
+                disabledBefore:manager.isPromptDisabledForActiveCharacter?.('worldInfoBefore')===true,
+                disabledAfter:manager.isPromptDisabledForActiveCharacter?.('worldInfoAfter')===true});
+            if(collections.length>6)collections.shift();
         });
         wrap('preparePrompt',([raw],result)=>{
             if(!result||!isText(raw?.content)||!isText(result.content))return;
-            const record={raw:raw.content,content:result.content,role:result.role,id:result.identifier};
-            if(historyIndex(result.identifier)){
-                if(history.size>=LIMIT||(chars+=raw.content.length+(raw.content===result.content?0:result.content.length))>TRACE_CHARS){limited=true;return;}
-                if(history.has(result.identifier)){limited=true;return;}
-                history.set(result.identifier,record);
-            }else if(/\{\{\s*outlet::/i.test(raw.content)){
-                if((chars+=raw.content.length+result.content.length)>CHARS){limited=true;return;}
-                prepared.set(result,record);
+            const id=result.identifier;
+            if(!historyIndex(id)&&!/\{\{\s*outlet::/i.test(raw.content))return;
+            const size=raw.content.length+(raw.content===result.content?0:result.content.length);
+            if(records>=2*LIMIT||chars+size>TRACE_CHARS)return;
+            records++;chars+=size;
+            const record={raw:raw.content,content:result.content,role:result.role,id};
+            prepared.set(result,record);
+            if(!native&&historyIndex(id)){
+                const previous=legacyHistory.get(id);
+                if(!previous)legacyHistory.set(id,record);
+                else if(previous.raw!==record.raw||previous.content!==record.content||previous.role!==record.role)legacyHistory.set(id,{ambiguous:true});
             }
         });
         wrap('setChatCompletion',([completion])=>{
-            const nodes=flatMessages(completion?.getMessages?.());
-            const extensions=extensionSnapshot(readExtensions());
-            const source=collection?.collection;
-            if(limited||!nodes||!extensions||!Array.isArray(source)||source.length>LIMIT){latest=null;return;}
-            let size=0;const prompts=[];
-            for(const p of source){
-                if(p.content!=null&&!isText(p.content)){latest=null;return;}
-                if((size+=(p.content?.length??0))>CHARS){latest=null;return;}
-                prompts.push({id:p.identifier,role:p.role,content:p.content??'',depth:p.injection_depth,
-                    position:p.injection_position,order:p.injection_order??100,relativePosition:p.position,
-                    extension:p.extension===true,raw:prepared.get(p)?.raw});
+            const nodes=flatMessages(completion?.getMessages?.(),native?message=>receipts.get(message):null);
+            if(!nodes)return;
+            const anchors=new Set(nodes.map(n=>n.receipt?.prompt).filter(Boolean));
+            const candidates=collections.filter(c=>c.type===type&&Array.isArray(c.collection?.collection));
+            const matched=candidates.filter(c=>c.collection.collection.some(prompt=>anchors.has(prompt)));
+            const chosen=matched.length===1?matched[0]:!matched.length&&collections.length===1&&candidates.length===1?candidates[0]:null;
+            const prompts=[];let size=0,collectionKnown=!!chosen?.extensions;
+            if(collectionKnown){
+                for(const p of chosen.collection.collection){
+                    if(p.content!=null&&!isText(p.content)||(size+=(p.content?.length??0))>CHARS||prompts.length>=LIMIT){collectionKnown=false;break;}
+                    prompts.push({id:p.identifier,role:p.role,content:p.content??'',depth:p.injection_depth,
+                        position:p.injection_position,order:p.injection_order??100,relativePosition:p.position,
+                        extension:p.extension===true,raw:prepared.get(p)?.raw});
+                }
             }
-            latest={nodes,extensions,prompts,history:new Map(history),noteBase,
-                disabledBefore:manager.isPromptDisabledForActiveCharacter?.('worldInfoBefore')===true,
-                disabledAfter:manager.isPromptDisabledForActiveCharacter?.('worldInfoAfter')===true,
+            const history=new Map();let historyKnown=true;
+            if(native){
+                for(const n of nodes){
+                    if(n.parent!=='chatHistory')continue;
+                    if(n.tools||n.role==='tool'){historyKnown=false;break;}
+                    if(!historyIndex(n.id))continue;
+                    const r=n.receipt?.record;
+                    if(!r||r.id!==n.id||r.content!==n.content||r.role!==n.role||history.has(n.id)){historyKnown=false;break;}
+                    history.set(n.id,r);
+                }
+            }else{
+                for(const [id,r] of legacyHistory){if(r.ambiguous){historyKnown=false;break;}history.set(id,r);}
+            }
+            if(!historyKnown)history.clear();
+            const snapshot={nodes:nodes.map(({receipt,...node})=>node),extensions:collectionKnown?chosen.extensions:new Map(),
+                prompts:collectionKnown?prompts:[],history,noteBase,collectionKnown,
+                disabledBefore:collectionKnown&&chosen.disabledBefore,disabledAfter:collectionKnown&&chosen.disabledAfter,
                 squashed:manager.serviceSettings?.squash_system_messages===true,
                 continuePrefill:manager.serviceSettings?.continue_prefill===true,type};
-            release();
+            latest=snapshot;
+            // ST returns a fresh chat array from this exact ChatCompletion
+            // instance after squashing. Correlate that array by identity;
+            // don't let the first dry-run completion steal the live trace.
+            if(typeof completion.getChat==='function')install(completion,'getChat',original=>function(...args){
+                const result=original.apply(this,args);
+                if(active&&this===completion&&Array.isArray(result))requests.set(result,snapshot);
+                return result;
+            });
         });
         return {
-            take(){const result=latest;release();latest=null;return result;},
-            release(){release();latest=null;},
+            take(messages){
+                const result=Array.isArray(messages)?requests.get(messages)??null:latest;
+                release();return result;
+            },
+            release,
         };
     }catch{release();return null;}
 }
@@ -265,7 +319,7 @@ function nativeDepthChoices(capture,trace,info,outlets,noteRows){
 }
 function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
     const choices=nativeDepthChoices(capture,trace,info,outlets,noteRows);
-    if(!choices?.length||!trace.history.size)return;
+    if(trace.collectionKnown===false||!choices?.length||!trace.history.size)return;
     const indices=[...trace.history.keys()].map(id=>Number(historyIndex(id)));
     const total=Math.max(...indices),lowest=Math.min(...indices);
     if(!positive(total)||total>LIMIT||lowest<1||indices.length!==total-lowest+1)return;
@@ -274,6 +328,7 @@ function traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded){
     let layouts=[[]];
     for(const options of choices){
         if(layouts.length*options.length>MAX_LAYOUTS)return;
+        if(options.length===1){if(options[0])for(const layout of layouts)layout.push(options[0]);continue;}
         layouts=layouts.flatMap(layout=>options.map(option=>option?[...layout,option]:layout));
     }
     // An entry is confirmed only when *every* possible layout consistent
@@ -368,7 +423,8 @@ export function buildTraceEvidence(capture,info,trace){
                 }
             }
         }
-        traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded);
+        // A depth-route failure must not discard independently proven native blocks.
+        try{traceDepth(capture,trace,info,aligned,outlets,noteRows,excluded);}catch{}
         for(const block of aligned.blocks){
             if(!block.entries.length)continue;
             const entries=[...new Map(block.entries.map(e=>[e.key,e])).values()];
