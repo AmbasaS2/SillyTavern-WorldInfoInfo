@@ -29,7 +29,7 @@ Lorebook Manager and Cherry&Solti's lorebook translator are optional. The core l
 
 ## ⚡ Quick start
 
-**Current version: 1.7.1-ambasa.8.**
+**Current version: 1.7.1-ambasa.9.**
 
 > **Generate a reply → tap the book → choose an entry → read.**
 >
@@ -271,7 +271,7 @@ https://github.com/AmbasaS2/SillyTavern-WorldInfoInfo
 
 ## ⚡ 간단 사용 설명
 
-**현재 버전: 1.7.1-ambasa.8.**
+**현재 버전: 1.7.1-ambasa.9.**
 
 > **평소처럼 롤플 → 책 버튼 → 궁금한 로어 누르기!**
 >
