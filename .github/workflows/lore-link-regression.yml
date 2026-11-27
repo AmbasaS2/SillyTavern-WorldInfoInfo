@@ -2,7 +2,7 @@ name: WorldInfo Info lore library integration
 on:
   pull_request:
   push:
-    branches: ['feat/lore-library-link-20261123']
+    branches: [master, 'feat/lore-library-link-20261123']
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -11,4 +11,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/*.test.cjs
+      - run: node --test tests/*.test.cjs comment-suffix-performance.test.mjs
+      - run: node --check index.js
