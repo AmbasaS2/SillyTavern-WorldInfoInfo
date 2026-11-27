@@ -3,6 +3,7 @@ import { translate as stTranslate, getCurrentLocale } from '../../../i18n.js';
 import { metadata_keys } from '../../../authors-note.js';
 import { extension_settings, getContext } from '../../../extensions.js';
 import { promptManager } from '../../../openai.js';
+import * as insightOpenAI from '../../../openai.js';
 import { SlashCommand } from '../../../slash-commands/SlashCommand.js';
 import { SlashCommandParser } from '../../../slash-commands/SlashCommandParser.js';
 import { delay, flashHighlight } from '../../../utils.js';
@@ -123,7 +124,16 @@ const WI_UI_EN = {
     "insight.help": "About these estimates",
     "insight.count": "{0} entries",
     "insight.noMatches": "No lore text confirmed.",
-    "insight.retry": "Retry missing estimates"
+    "insight.retry": "Retry missing estimates",
+    "insight.jev.source.all": "Jev full assessment",
+    "insight.jev.source.native": "Native search candidate",
+    "insight.jev.source.adaptive-durable": "Durable-memory cue",
+    "insight.jev.source.adaptive-concise": "Short-memory cue",
+    "insight.jev.source.adaptive-role": "Memory-role cue",
+    "insight.jev.source.adaptive-anchors": "Title/key cues",
+    "insight.jev.source.adaptive-recent": "Recent source cue",
+    "insight.jev.score": "Selection score {0}",
+    "insight.jev.accepted": "Budget accepted"
 };
 function wiT(key, ...values) {
     const source = WI_UI_EN[key] ?? key;
@@ -437,7 +447,11 @@ const displayedActivationEvents = new WeakMap();
 function describeLoreActivation(entry) {
     const outletSuffix = confirmedOutletEntries.has(entry) ? ' · ' + wiT('reader.route.outlet') : '';
     // Jev evidence belongs to this displayed entry, not the saved constant flag.
-    if (entry?.stwiiJevRecall === true) return '🔮 ' + wiT('reader.reason.jev') + outletSuffix;
+    if (entry?.stwiiJevRecall === true) {
+        let selection='';
+        try{selection=globalThis.STWII?.loreInsight?.selectionFor(entry)||'';}catch{}
+        return '🔮 ' + wiT('reader.reason.jev') + (selection?' · '+selection:'') + outletSuffix;
+    }
     const events = chat_metadata.stwiiLastReport?.added;
     const ev = displayedActivationEvents.has(entry) ? displayedActivationEvents.get(entry) :
         (Array.isArray(events) ? events.find(item =>
@@ -697,7 +711,7 @@ function promptTextParts(value) {
     if (value.parts !== undefined) return promptTextParts(value.parts);
     return [];
 }
-function renderedWiContent(entry) {
+function renderedWiContent(entry, preserveWhitespace = false) {
     if (!entry?.content || entry.disable === true) return '';
     if (entry.position === world_info_position.outlet && !entry.outletName) return '';
     try {
@@ -705,7 +719,7 @@ function renderedWiContent(entry) {
         const text = getRegexedString(entry.content, regex_placement.WORLD_INFO, {
             depth, isMarkdown: false, isPrompt: true,
         });
-        return typeof text === 'string' ? text.trim() : '';
+        return typeof text === 'string' ? (preserveWhitespace ? text : text.trim()) : '';
     } catch (error) {
         console.warn('🦥 WorldInfo Info', '[WorldInfo Info] Unable to verify entry content', error);
         return '';
@@ -721,8 +735,9 @@ function confirmedWiEntries(entryList, generationData, insightCapture = null) {
         // SillyTavern has already applied probability, budget, group and activation rules
         // before WORLD_INFO_ACTIVATED. Do not turn an unprovable string comparison into
         // 'No active entries' for ordinary (non-outlet) entries.
-        const rendered = renderedWiContent(entry);
-        try{insightCapture?.add(entry,rendered,entry.position === world_info_position.outlet);}catch{}
+        const exactRendered = renderedWiContent(entry, true);
+        const rendered = exactRendered.trim();
+        try{insightCapture?.add(entry,exactRendered,entry.position === world_info_position.outlet);}catch{}
         if (!rendered) return false;
         if (entry.position !== world_info_position.outlet) return true;
 
@@ -1264,7 +1279,7 @@ const init = ()=>{
             if(api==='openai'&&!model)return null;
             return JSON.stringify([generationSerial,getCurrentChatId(),api,
                 ctx.chatCompletionSettings?.chat_completion_source,ctx.textCompletionSettings?.type,
-                model,ctx.powerUserSettings.tokenizer]);
+                model,ctx.powerUserSettings.tokenizer,ctx.characterId??null,ctx.groupId??null]);
         }catch{return null;}
     }
     function sharedLoreTokenScope(){
@@ -1553,7 +1568,10 @@ const init = ()=>{
         }
         try {
             STWII.loreInsight?.finish(insightCapture, complete, main_api === 'openai'
-                ? {messages:data?.prompt,type:generationType} : null);
+                ? {messages:data?.prompt,type:generationType,structure:promptManager.messages,
+                    squashed:getContext()?.chatCompletionSettings?.squash_system_messages===true,
+                    beforePosition:world_info_position.before,afterPosition:world_info_position.after,
+                    formatWorldInfo:insightOpenAI.formatWorldInfo} : null);
         } catch {}
         lastReportBuild = null;
         stwiiCurrentBuild = null;

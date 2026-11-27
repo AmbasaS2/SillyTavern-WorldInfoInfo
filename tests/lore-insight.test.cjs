@@ -201,3 +201,31 @@ test('closing the dialog or changing chat cancels scheduled automatic measuremen
   insight.open();chat='other';await tick();assert.equal(calls,0);insight.clear();
  }finally{global.document=old;}
 });
+
+test('STLO consumer publishes structural evidence when closed and counts only when opened',async()=>{
+ const {createLoreInsight}=await mod();const old=global.document;global.document=fakeDocument();
+ try{
+  let listener=null,calls=[],publications=[],local=0;
+  const generation={},context={generation,tokenizer:'st-1:test'};
+  const ledger=new Map();
+  const bridge={version:1,context:()=>context,
+   selection:()=>({decision:'include',source:'adaptive-role',score:0.91,budget:'accepted',activated:true}),
+   lookup:d=>ledger.get(d.text)??null,
+   measure:async d=>{calls.push(d);ledger.set(d.text,17);return 17},
+   publishInjection:d=>{publications.push(d);return true}};
+  const insight=createLoreInsight({t:(k,v)=>k+(v===undefined?'':' '+v),countText:async s=>{local++;return s.length},getScope:()=> 'scope',getChatId:()=> 'chat',getReason:()=> 'jev',titleFor:e=>e.comment,isVisible:()=>true,reasonLabel:r=>r,getMetricsBridge:()=>bridge,watchRequest:fn=>{listener=fn;return()=>{listener=null}}});
+  insight.start();const a={...entry(1),position:0,order:1,stwiiJevRecall:true,comment:'Jev scene'},b={...entry(2),position:4,order:2,stwiiJevRecall:true,comment:'Depth scene'};
+  const cap=insight.beginCapture(1,'chat',2);cap.add(a,'A scene.');cap.add(b,'B scene.');cap.setPrompt(['A scene.','B scene.'],null);
+  const first={role:'system',content:'A scene.'},second={role:'system',content:'B scene.'};
+  const structure={getCollection:()=>[{identifier:'worldInfoBefore',getCollection:()=>[{...first,identifier:'worldInfoBefore'}]},{identifier:'chatHistory',getCollection:()=>[{...second,identifier:'chatHistory-1'}]}]};
+  insight.finish(cap,true,{messages:[first,second],type:'normal',structure,beforePosition:0,afterPosition:1,formatWorldInfo:s=>s});
+  listener({type:'normal',messages:[first,second]});
+  assert.equal(publications.length,1);assert.equal(calls.length,0);assert.equal(local,0);
+  assert.deepEqual(publications[0].records,[{key:'["Book",1]',status:'confirmed',text:'A scene.\n'},{key:'["Book",2]',status:'unknown'}]);
+  assert.equal(publications[0].complete,true);
+  insight.open();await tick();
+  assert.equal(calls.length,2);assert.equal(local,2);assert.equal(publications.length,2);
+  assert.match(insight.selectionFor(a),/adaptive-role/);assert.match(document.body.textContent,/insight.jev.score/);
+  assert.equal(publications[1].records[1].status,'unknown');insight.clear();
+ }finally{global.document=old;}
+});

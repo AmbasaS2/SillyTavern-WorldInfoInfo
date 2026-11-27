@@ -101,5 +101,14 @@
   "worldInfoInfo.insight.retry": "미계측 토큰 다시 계산",
   "worldInfoInfo.insight.help": "통계 확인 기준",
   "worldInfoInfo.insight.count": "{0}개",
-  "worldInfoInfo.insight.noMatches": "확인된 로어 본문이 없어요."
+  "worldInfoInfo.insight.noMatches": "확인된 로어 본문이 없어요.",
+  "worldInfoInfo.insight.jev.source.all": "Jev 전체 판단",
+  "worldInfoInfo.insight.jev.source.native": "기존 검색 후보",
+  "worldInfoInfo.insight.jev.source.adaptive-durable": "장기 기억 단서",
+  "worldInfoInfo.insight.jev.source.adaptive-concise": "짧은 기억 단서",
+  "worldInfoInfo.insight.jev.source.adaptive-role": "기억 역할 단서",
+  "worldInfoInfo.insight.jev.source.adaptive-anchors": "제목·키워드 단서",
+  "worldInfoInfo.insight.jev.source.adaptive-recent": "최근 출처 단서",
+  "worldInfoInfo.insight.jev.score": "선택 점수 {0}",
+  "worldInfoInfo.insight.jev.accepted": "예산 통과"
 }
