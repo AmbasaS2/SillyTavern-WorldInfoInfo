@@ -53,6 +53,7 @@ function extensionSnapshot(value){
 export function observePromptAssembly(manager,readExtensions,type,noteBase=null,messageClass=null){
     if(!manager||!['getPromptCollection','preparePrompt','setChatCompletion'].every(k=>typeof manager[k]==='function'))return null;
     const restorers=[],native=typeof messageClass?.fromPromptAsync==='function';
+    const recentRequests=[];
     let active=true,collections=[],prepared=new WeakMap(),receipts=new WeakMap(),requests=new WeakMap(),
         legacyHistory=new Map(),latest=null,chars=0,records=0;
     function install(target,name,factory){
@@ -75,7 +76,7 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null,
     function release(){
         active=false;
         for(const restore of restorers.reverse())try{restore();}catch{}
-        restorers.length=0;collections=[];prepared=new WeakMap();receipts=new WeakMap();requests=new WeakMap();legacyHistory.clear();latest=null;
+        restorers.length=0;collections=[];prepared=new WeakMap();receipts=new WeakMap();requests=new WeakMap();recentRequests.length=0;legacyHistory.clear();latest=null;
     }
     try{
         // Native history IDs are local to an assembly. A concurrent dry-run
@@ -159,15 +160,28 @@ export function observePromptAssembly(manager,readExtensions,type,noteBase=null,
                     // Prompt-ready handlers can change unrelated messages.
                     // Keep the native placement and its original object.
                     const originals=result.slice();
-                    const messages=originals.map(message=>({role:message?.role,name:message?.name,content:message?.content}));
-                    requests.set(result,{...snapshot,originals,messages});
+                    const messages=originals.map(message=>({
+                        role:message?.role,name:message?.name,content:message?.content,
+                    }));
+                    const request={...snapshot,originals,messages};
+                    requests.set(result,request);
+                    recentRequests.push(request);
+                    if(recentRequests.length>6)recentRequests.shift();
                 }
                 return result;
             });
         });
         return {
             take(messages){
-                const result=Array.isArray(messages)?requests.get(messages)??null:latest;
+                let result=Array.isArray(messages)?requests.get(messages)??null:latest;
+                if(!result&&Array.isArray(messages)&&messages.length>0&&messages.length<=LIMIT){
+                    // Some host paths replace the array before GENERATE_AFTER_DATA.
+                    // Keep native source proof only for a unique current assembly
+                    // with the same message objects in the same order.
+                    const matches=recentRequests.filter(({originals})=>originals.length===messages.length
+                        &&originals.every((message,i)=>message===messages[i]));
+                    if(matches.length===1)result=matches[0];
+                }
                 release();return result;
             },
             release,

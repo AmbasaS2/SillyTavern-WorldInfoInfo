@@ -140,6 +140,26 @@ test('concurrent native assemblies reuse history IDs without stealing the live r
  assert.deepEqual(buildTraceEvidence(capture,info,trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
 });
 
+test('a copied request array retains native proof when its ordered message objects are unchanged',async()=>{
+ const {observePromptAssembly,buildTraceEvidence}=await mod();
+ const manager={getPromptCollection:()=>({collection:[]}),preparePrompt:p=>p,setChatCompletion(){}};
+ const observer=observePromptAssembly(manager,()=>({}),'normal');
+ const other=req('Earlier history','user');
+ const wire=[req('Real'),other];
+ const completion={getMessages:()=>({getCollection:()=>[
+  {identifier:'worldInfoAfter',getCollection:()=>[{identifier:'worldInfoAfter',role:'system',content:'Real'}]},
+  {identifier:'chatHistory',getCollection:()=>[{identifier:'chatHistory-1',role:'user',content:'Earlier history'}]}
+ ]}),getChat:()=>wire};
+ manager.getPromptCollection('normal');manager.setChatCompletion(completion);completion.getChat();
+ other.content='Updated history';
+ const messages=wire.slice();
+ const trace=observer.take(messages);
+ assert.equal(trace.originals[1],other);
+ assert.equal(trace.messages[1].content,'Earlier history');
+ const {capture,info}=fixture([row(1,1,'Real')],[],messages);
+ assert.deepEqual(buildTraceEvidence(capture,{...info,messages:trace.messages},trace).blocks.flatMap(b=>b.entries.map(e=>e.key)),['["Book",1]']);
+});
+
 test('squashing preserves the native break caused by an empty non-system message',async()=>{
  const {buildTraceEvidence}=await mod();
  const rows=[row(1,1,'Real')],nodes=[node('main','main'),node('chatHistory-1','','chatHistory','assistant'),node('worldInfoAfter','Real')];
