@@ -64,7 +64,7 @@ export function connectStloMetrics(getBridge=()=>globalThis.STLOMemoryMetrics){
 // provenance here: never promote a substring hit into a confirmed receipt.
 export function buildStructuredProof(capture,info){
     const result=[];
-    if(capture.truncated||capture.promptLimited||!Array.isArray(info?.messages)||
+    if(capture.truncated||!Array.isArray(info?.messages)||
         info.messages.length>4096||typeof info.formatWorldInfo!=='function'||
         !info.structure||info.squashed===true)return result;
     if(capture.observed!==capture.rows.length)return result;
@@ -135,7 +135,7 @@ export function confirmStructuredProof(blocks,messages){
 
 export function buildInjectionRecords(capture,isVisible,scanComplete){
     const records=[],seen=new Set();
-    let complete=!capture.truncated&&!capture.promptLimited&&
+    let complete=!capture.truncated&&(!capture.promptLimited||capture.requestProofChecked===true)&&
         (capture.observed===capture.rows.length||(capture.observed===null&&scanComplete&&capture.rows.length===0));
     for(const row of capture.rows){
         const key=metricsKey(row.entry);
