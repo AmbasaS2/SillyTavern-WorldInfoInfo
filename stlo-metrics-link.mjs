@@ -57,11 +57,54 @@ export function connectStloMetrics(getBridge=()=>globalThis.STLOMemoryMetrics){
     return {live,selection,count,publish};
 }
 
-// ST 1.19.1 PromptManager keeps identifiers for the dedicated before/after
-// World Info collections. Flatten in the same order as ChatCompletion.getChat.
-// Only accept an exact correspondence to the actual assembled message array.
-// Other insertion routes (including at-depth and outlets) do not expose this
-// provenance here: never promote a substring hit into a confirmed receipt.
+// Match the complete formatted native block. ST reverses equal-priority
+// entries when inserting them. An activation listener can reorder those
+// entries after ST has already produced the block, so verify exact boundaries
+// and multiplicity rather than relying on the event's tie order.
+export function matchesNativeLoreGroup(rows,content,format){
+    if(typeof content!=='string'||!rows.length||
+        rows.some(row=>!row.text.trim()||!Number.isFinite(row.entry.order)))return false;
+    const ordered=rows.slice().sort((a,b)=>b.entry.order-a.entry.order).reverse();
+    const joined=ordered.map(row=>row.text).join('\n');
+    if(content===format(joined)&&content.includes(joined))return true;
+
+    const marker='\u0000stwii-native-lore\u0000';
+    const wrapped=format(marker);
+    if(typeof wrapped!=='string'||wrapped.indexOf(marker)<0||wrapped.indexOf(marker)!==wrapped.lastIndexOf(marker))return false;
+    const split=wrapped.indexOf(marker),prefix=wrapped.slice(0,split),suffix=wrapped.slice(split+marker.length);
+    if(content.length!==prefix.length+joined.length+suffix.length||
+        !content.startsWith(prefix)||!content.endsWith(suffix))return false;
+    const body=content.slice(prefix.length,prefix.length+joined.length);
+    if(format(body)!==content)return false;
+
+    let offset=0;
+    for(let start=0;start<ordered.length;){
+        let end=start+1;
+        const order=ordered[start].entry.order,counts=new Map([[ordered[start].text,1]]);
+        while(end<ordered.length&&ordered[end].entry.order===order){
+            const text=ordered[end++].text;
+            counts.set(text,(counts.get(text)??0)+1);
+        }
+        for(let i=start;i<end;i++){
+            let match=null;
+            for(const text of counts.keys()){
+                if(!body.startsWith(text,offset)||body[offset+text.length]!==(i===ordered.length-1?undefined:'\n'))continue;
+                if(match!==null)return false;
+                match=text;
+            }
+            if(match===null)return false;
+            const left=counts.get(match)-1;
+            if(left)counts.set(match,left);else counts.delete(match);
+            offset+=match.length+(i===ordered.length-1?0:1);
+        }
+        start=end;
+    }
+    return offset===body.length;
+}
+
+// The dedicated PromptManager collection establishes source. Bind its
+// complete block to a unique exact message from this assembly; unrelated
+// collections need not be byte-for-byte equal.
 export function buildStructuredProof(capture,info){
     const result=[];
     if(capture.truncated||!Array.isArray(info?.messages)||
@@ -71,22 +114,6 @@ export function buildStructuredProof(capture,info){
     try{
         const root=info.structure.getCollection?.();
         if(!Array.isArray(root)||root.length>4096)return result;
-        const flat=[];
-        for(const item of root){
-            const nested=typeof item?.getCollection==='function'?item.getCollection():null;
-            if(nested!==null&&!Array.isArray(nested))return [];
-            for(const message of nested??[item]){
-                if(typeof message?.getCollection==='function')return [];
-                if(message?.content||message?.tool_calls)flat.push({parent:nested?item.identifier:null,message});
-                if(flat.length>4096)return [];
-            }
-        }
-        if(flat.length!==info.messages.length)return [];
-        // Full ordered alignment; refuse to guess from text in arbitrary chat.
-        for(let i=0;i<flat.length;i++){
-            const a=flat[i].message,b=info.messages[i];
-            if(!b||a.role!==b.role||a.content!==b.content||(a.name||'')!==(b.name||''))return [];
-        }
         const keys=new Set();
         for(const row of capture.rows){
             const key=metricsKey(row.entry);
@@ -96,19 +123,16 @@ export function buildStructuredProof(capture,info){
         for(const [position,identifier] of [[info.beforePosition,'worldInfoBefore'],[info.afterPosition,'worldInfoAfter']]){
             if(!Number.isInteger(position))continue;
             const group=capture.rows.filter(row=>row.entry.position===position&&!row.outlet&&row.text.length>0);
-            if(!group.length||group.some(row=>!Number.isFinite(row.entry.order)||!row.text.trim()))continue;
-            // Host sorts descending and unshifts: reversing also handles ties.
-            const ordered=group.slice().sort((a,b)=>b.entry.order-a.entry.order).reverse();
-            const joined=ordered.map(row=>row.text).join('\n');
-            const exact=info.formatWorldInfo(joined);
-            if(typeof exact!=='string'||!exact||!exact.includes(joined))continue;
-            const indices=flat.map((node,i)=>node.parent===identifier&&node.message.identifier===identifier?i:-1).filter(i=>i>=0);
-            if(indices.length!==1)continue;
-            const message=info.messages[indices[0]];
-            if(message.content!==exact||flat[indices[0]].message.content!==exact)continue;
-            // Keep only the correlated message reference, its exact text, role
-            // and bounded key list until the existing pre-send hook fires.
-            result.push({message,text:exact,role:message.role,name:message.name||'',entries:ordered.map(row=>({key:metricsKey(row.entry),text:row.text+'\n'}))});
+            const collections=root.filter(item=>item?.identifier===identifier);
+            if(collections.length!==1)continue;
+            const children=collections[0].getCollection?.();
+            if(!Array.isArray(children)||children.length!==1||children[0]?.identifier!==identifier)continue;
+            const source=children[0],text=source.content,role=source.role,name=source.name||'';
+            if(!matchesNativeLoreGroup(group,text,info.formatWorldInfo))continue;
+            const matches=info.messages.filter(message=>message?.content===text&&message.role===role&&(message.name||'')===name);
+            if(matches.length!==1)continue;
+            const ordered=group.sort((a,b)=>b.entry.order-a.entry.order).reverse();
+            result.push({message:matches[0],text,role,name,entries:ordered.map(row=>({key:metricsKey(row.entry),text:row.text+'\n'}))});
         }
     }catch{return [];}
     return result;
